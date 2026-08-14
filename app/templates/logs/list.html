@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn, result_btn with context %}
+{% block title %}{{ t('logs_title') }} · {{ verification.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('admin.project_list') }}">{{ t('nav_projects') }}</a>
+      <i class="bi bi-chevron-right"></i>
+      <a href="{{ url_for('admin.verification_list', project_id=project.id) }}">{{ project.name }}</a>
+      <i class="bi bi-chevron-right"></i>
+      <a href="{{ url_for('admin.verification_edit', project_id=project.id, verification_id=verification.id) }}">{{ verification.name }}</a>
+    </p>
+    <h1 class="page-title"><i class="bi bi-journal-text"></i> {{ t('logs_title') }}</h1>
+  </div>
+  {{ icon_btn(t('view_keys'), 'bi-key', href=url_for('admin.key_list', project_id=project.id, verification_id=verification.id)) }}
+</div>
+<section class="panel">
+  <form method="get" class="filter-bar">
+    <div class="filter-field">
+      <span>{{ t('result') }}</span>
+      <select class="form-select" name="result">
+        <option value="">{{ t('all') }}</option>
+        {% for code in result_codes %}
+        <option value="{{ code }}"{% if result == code %} selected{% endif %}>{{ t('res_' + code) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-primary filter-submit" type="submit">
+      <i class="bi bi-funnel"></i><span>{{ t('filter') }}</span>
+    </button>
+  </form>
+  <div class="table-wrap">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>{{ t('created_at') }}</th>
+          <th>{{ t('key_code') }}</th>
+          <th>{{ t('result') }}</th>
+          <th>{{ t('hwid') }}</th>
+          <th>{{ t('ip') }}</th>
+          <th>{{ t('user_agent') }}</th>
+          <th>{{ t('duration') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.created_at }}</td>
+          <td><code>{{ log.key_code|mask_key }}</code></td>
+          <td>{{ result_btn(log.result) }}</td>
+          <td>{{ log.hwid or t('none') }}</td>
+          <td>{{ log.ip }}</td>
+          <td class="ua-cell">{{ log.user_agent }}</td>
+          <td>{{ log.duration_ms }} ms</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">{{ t('empty') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="pager">
+    {% if page > 1 %}
+    <a class="btn btn-sm btn-outline-secondary" href="?page={{ page - 1 }}&result={{ result }}">
+      <i class="bi bi-chevron-left"></i><span>{{ t('page_prev') }}</span>
+    </a>
+    {% endif %}
+    <span>{{ page }} / {{ pages }} ({{ total }})</span>
+    {% if page < pages %}
+    <a class="btn btn-sm btn-outline-secondary" href="?page={{ page + 1 }}&result={{ result }}">
+      <i class="bi bi-chevron-right"></i><span>{{ t('page_next') }}</span>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

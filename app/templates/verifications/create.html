@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn %}
+{% block title %}{{ t('new_verification') }} · {{ project.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title"><i class="bi bi-plus-square"></i> {{ t('new_verification') }}</h1>
+  {{ icon_btn(t('cancel'), 'bi-x-lg', href=url_for('admin.verification_list', project_id=project.id)) }}
+</div>
+<form method="post" class="panel form-narrow stack-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="form-label" for="name">{{ t('name') }}</label>
+  <input class="form-control" id="name" name="name" required>
+  <label class="form-label" for="slug">{{ t('slug') }}</label>
+  <input class="form-control" id="slug" name="slug" required>
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
+    <label class="form-check-label" for="enabled">{{ t('enabled') }}</label>
+  </div>
+  <button class="btn btn-primary" type="submit">
+    <i class="bi bi-check2"></i><span>{{ t('create') }}</span>
+  </button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.VerifyLite.bindSlug("name", "slug");
+</script>
+{% endblock %}

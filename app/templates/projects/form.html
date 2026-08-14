@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn %}
+{% block title %}{{ t('edit_project') if project else t('new_project') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">
+    <i class="bi {{ 'bi-pencil-square' if project else 'bi-plus-square' }}"></i>
+    {{ t('edit_project') if project else t('new_project') }}
+  </h1>
+  {{ icon_btn(t('cancel'), 'bi-x-lg', href=url_for('admin.project_list')) }}
+</div>
+<form method="post" class="panel form-narrow stack-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="form-label" for="name">{{ t('name') }}</label>
+  <input class="form-control" id="name" name="name" value="{{ project.name if project else '' }}" required>
+  <label class="form-label" for="slug">{{ t('slug') }}</label>
+  <input class="form-control" id="slug" name="slug" value="{{ project.slug if project else '' }}" required>
+  <label class="form-label" for="description">{{ t('description') }}</label>
+  <textarea class="form-control" id="description" name="description" rows="3">{{ project.description if project else '' }}</textarea>
+  <div class="form-check">
+    <input class="form-check-input" type="checkbox" id="enabled" name="enabled"{% if not project or project.enabled %} checked{% endif %}>
+    <label class="form-check-label" for="enabled">{{ t('enabled') }}</label>
+  </div>
+  <button class="btn btn-primary" type="submit">
+    <i class="bi bi-check2"></i><span>{{ t('save') if project else t('create') }}</span>
+  </button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.VerifyLite.bindSlug("name", "slug");
+</script>
+{% endblock %}

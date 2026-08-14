@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn %}
+{% block title %}{{ t('batch_result') }} · {{ verification.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title"><i class="bi bi-collection"></i> {{ t('batch_result') }} #{{ batch.id }}</h1>
+  {{ icon_btn(t('keys'), 'bi-key', href=url_for('admin.key_list', project_id=project.id, verification_id=verification.id)) }}
+</div>
+<section class="panel">
+  <p>{{ t('keys_issued', n=issued|length) }}</p>
+  <textarea class="form-control font-mono" id="issued-keys" rows="16" readonly>{{ issued|join('\n') }}</textarea>
+  <div class="head-actions mt-3">
+    <button class="btn btn-primary js-copy" type="button" data-copy-from="issued-keys">
+      <i class="bi bi-clipboard"></i><span>{{ t('copy') }}</span>
+    </button>
+    <button class="btn btn-outline-secondary js-download-text" type="button" data-from="issued-keys" data-filename="{{ project.slug }}-{{ verification.slug }}-batch-{{ batch.id }}.txt">
+      <i class="bi bi-download"></i><span>{{ t('download') }}</span>
+    </button>
+  </div>
+</section>
+{% endblock %}

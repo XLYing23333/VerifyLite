@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% from "macros.html" import result_btn with context %}
+{% block title %}{{ t('dashboard_title') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title"><i class="bi bi-speedometer2"></i> {{ t('dashboard_title') }}</h1>
+</div>
+<form method="get" class="filter-bar" id="dash-filter">
+  <div class="filter-field">
+    <span>{{ t('project') }}</span>
+    <select class="form-select" id="dash-project" name="project_id" aria-label="{{ t('project') }}">
+      <option value="">{{ t('filter_all_projects') }}</option>
+      {% for item in projects %}
+      <option value="{{ item.id }}"{% if selected_project_id == item.id %} selected{% endif %}>{{ item.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="filter-field">
+    <span>{{ t('verification') }}</span>
+    <select class="form-select" id="dash-verification" name="verification_id" aria-label="{{ t('verification') }}">
+      <option value="">{{ t('filter_all_verifications') }}</option>
+      {% for item in verifications %}
+      <option value="{{ item.id }}" data-project="{{ item.project_id }}"{% if selected_verification_id == item.id %} selected{% endif %}>{{ item.project.name }} / {{ item.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="btn btn-primary filter-submit" type="submit">
+    <i class="bi bi-funnel"></i><span>{{ t('filter') }}</span>
+  </button>
+</form>
+<section class="stat-grid">
+  <article class="stat-card">
+    <i class="bi bi-folder2"></i>
+    <div>
+      <p class="stat-label">{{ t('stat_projects') }}</p>
+      <p class="stat-value">{{ project_count }}</p>
+    </div>
+  </article>
+  <article class="stat-card">
+    <i class="bi bi-diagram-3"></i>
+    <div>
+      <p class="stat-label">{{ t('stat_verifications') }}</p>
+      <p class="stat-value">{{ verification_count }}</p>
+    </div>
+  </article>
+  <article class="stat-card">
+    <i class="bi bi-key"></i>
+    <div>
+      <p class="stat-label">{{ t('stat_keys') }}</p>
+      <p class="stat-value">{{ key_count }}</p>
+    </div>
+  </article>
+  <article class="stat-card">
+    <i class="bi bi-activity"></i>
+    <div>
+      <p class="stat-label">{{ t('stat_calls_today') }}</p>
+      <p class="stat-value">{{ calls_today }}</p>
+    </div>
+  </article>
+  <article class="stat-card">
+    <i class="bi bi-check2-circle"></i>
+    <div>
+      <p class="stat-label">{{ t('stat_success_today') }}</p>
+      <p class="stat-value">{{ success_today }}</p>
+    </div>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>{{ t('chart_7d') }}</h2>
+  <div class="chart-wrap">
+    <div id="usage-chart"></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>{{ t('recent_logs') }}</h2>
+  <div class="table-wrap">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>{{ t('created_at') }}</th>
+          <th>{{ t('key_code') }}</th>
+          <th>{{ t('result') }}</th>
+          <th>{{ t('hwid') }}</th>
+          <th>{{ t('ip') }}</th>
+          <th>{{ t('duration') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in recent_logs %}
+        <tr>
+          <td>{{ log.created_at }}</td>
+          <td><code>{{ log.key_code|mask_key }}</code></td>
+          <td>{{ result_btn(log.result) }}</td>
+          <td>{{ log.hwid or t('none') }}</td>
+          <td>{{ log.ip }}</td>
+          <td>{{ log.duration_ms }} ms</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">{{ t('empty') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script>
+  (function () {
+    const form = document.getElementById("dash-filter");
+    const projectSel = document.getElementById("dash-project");
+    const verifySel = document.getElementById("dash-verification");
+    if (form && projectSel && verifySel) {
+      function syncVerifyOptions() {
+        const pid = projectSel.value;
+        let keep = false;
+        Array.prototype.forEach.call(verifySel.options, function (opt) {
+          if (!opt.value) {
+            opt.hidden = false;
+            return;
+          }
+          const match = !pid || opt.getAttribute("data-project") === pid;
+          opt.hidden = !match;
+          opt.disabled = !match;
+          if (match && opt.selected) {
+            keep = true;
+          }
+        });
+        if (!keep) {
+          verifySel.value = "";
+        }
+      }
+      syncVerifyOptions();
+      projectSel.addEventListener("change", function () {
+        if (!projectSel.value) {
+          verifySel.value = "";
+        }
+        syncVerifyOptions();
+        form.submit();
+      });
+      verifySel.addEventListener("change", function () {
+        form.submit();
+      });
+    }
+
+    const node = document.getElementById("usage-chart");
+    if (!node || !window.echarts) {
+      return;
+    }
+
+    const labels = {{ chart_labels|tojson }};
+    const successData = {{ chart_success|tojson }};
+    const failData = {{ chart_fail|tojson }};
+    const successLabel = {{ t('chart_success')|tojson }};
+    const failLabel = {{ t('chart_fail')|tojson }};
+    const chart = echarts.init(node, null, { renderer: "canvas" });
+
+    function readToken(name) {
+      return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function hexAlpha(color, alpha) {
+      const raw = String(color || "").trim();
+      if (raw.startsWith("#") && (raw.length === 7 || raw.length === 4)) {
+        let hex = raw.slice(1);
+        if (hex.length === 3) {
+          hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+        }
+        const n = parseInt(hex, 16);
+        const r = (n >> 16) & 255;
+        const g = (n >> 8) & 255;
+        const b = n & 255;
+        return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+      }
+      return raw;
+    }
+
+    function buildOption() {
+      const text = readToken("--text");
+      const muted = readToken("--muted");
+      const line = readToken("--line");
+      const accent = readToken("--accent");
+      const danger = readToken("--danger");
+      const font = readToken("--font");
+      const bgElev = readToken("--bg-elev");
+      return {
+        color: [accent, danger],
+        textStyle: { color: muted, fontFamily: font },
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: bgElev,
+          borderColor: line,
+          borderWidth: 1,
+          textStyle: { color: text, fontFamily: font }
+        },
+        legend: {
+          data: [successLabel, failLabel],
+          top: 0,
+          icon: "circle",
+          itemWidth: 10,
+          itemHeight: 10,
+          textStyle: { color: muted, fontFamily: font }
+        },
+        grid: {
+          left: 8,
+          right: 12,
+          top: 40,
+          bottom: 4,
+          containLabel: true
+        },
+        xAxis: {
+          type: "category",
+          data: labels,
+          boundaryGap: false,
+          axisLine: { lineStyle: { color: line } },
+          axisTick: { show: false },
+          axisLabel: { color: muted }
+        },
+        yAxis: {
+          type: "value",
+          min: 0,
+          minInterval: 1,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: muted },
+          splitLine: { lineStyle: { color: line, type: "dashed" } }
+        },
+        series: [
+          {
+            name: successLabel,
+            type: "line",
+            smooth: 0.3,
+            symbol: "circle",
+            symbolSize: 8,
+            showSymbol: true,
+            lineStyle: { width: 2.5 },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: hexAlpha(accent, 0.28) },
+                { offset: 1, color: hexAlpha(accent, 0.02) }
+              ])
+            },
+            data: successData
+          },
+          {
+            name: failLabel,
+            type: "line",
+            smooth: 0.3,
+            symbol: "circle",
+            symbolSize: 8,
+            showSymbol: true,
+            lineStyle: { width: 2.5 },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: hexAlpha(danger, 0.22) },
+                { offset: 1, color: hexAlpha(danger, 0.02) }
+              ])
+            },
+            data: failData
+          }
+        ]
+      };
+    }
+
+    function render() {
+      chart.setOption(buildOption(), true);
+    }
+
+    render();
+    window.addEventListener("resize", function () {
+      chart.resize();
+    });
+    if (window.ResizeObserver) {
+      new ResizeObserver(function () {
+        chart.resize();
+      }).observe(node.parentElement || node);
+    }
+    if (window.matchMedia) {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      if (media.addEventListener) {
+        media.addEventListener("change", render);
+      } else if (media.addListener) {
+        media.addListener(render);
+      }
+    }
+  })();
+</script>
+{% endblock %}

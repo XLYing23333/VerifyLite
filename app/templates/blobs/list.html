@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn, icon_only %}
+{% block title %}{{ t('blobs_title') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title"><i class="bi bi-archive"></i> {{ t('blobs_title') }}</h1>
+</div>
+<section class="panel">
+  <h2 class="subhead">{% if edit_blob %}{{ t('edit') }}{% else %}{{ t('upload') }}{% endif %}</h2>
+  <form method="post" enctype="multipart/form-data" class="batch-grid" action="{% if edit_blob %}{{ url_for('admin.blob_edit', blob_id=edit_blob.id) }}{% else %}{{ url_for('admin.blob_list') }}{% endif %}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label class="form-label" for="name">{{ t('blob_name') }}</label>
+      <input class="form-control" id="name" name="name" placeholder="payload.bin" value="{{ edit_blob.name if edit_blob else '' }}">
+    </div>
+    <div>
+      <label class="form-label" for="scope">{{ t('scope') }}</label>
+      <select class="form-select" id="scope" name="scope">
+        <option value="all"{% if selected_scope == 'all' %} selected{% endif %}>{{ t('scope_all') }}</option>
+        {% for value, label in scope_options %}
+        <option value="{{ value }}"{% if selected_scope == value %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label" for="file">{% if edit_blob %}{{ t('blob_replace_file') }}{% else %}{{ t('file') }}{% endif %} (≤ {{ max_blob_size|filesize }})</label>
+      <label class="file-field">
+        <input class="file-field-input" id="file" name="file" type="file"{% if not edit_blob %} required{% endif %}>
+        <span class="file-field-btn"><i class="bi bi-folder2-open"></i><span>{{ t('choose_file') }}</span></span>
+        <span class="file-field-name" data-empty="{{ t('no_file_chosen') }}">{{ t('no_file_chosen') }}</span>
+      </label>
+    </div>
+    <div class="span-2 blob-form-actions">
+      <button class="btn btn-primary" type="submit">
+        {% if edit_blob %}
+        <i class="bi bi-check2"></i><span>{{ t('save') }}</span>
+        {% else %}
+        <i class="bi bi-upload"></i><span>{{ t('upload') }}</span>
+        {% endif %}
+      </button>
+      {% if edit_blob %}
+      {{ icon_btn(t('cancel'), 'bi-x-lg', href=url_for('admin.blob_list')) }}
+      {% endif %}
+    </div>
+  </form>
+</section>
+<section class="panel">
+  <div class="table-wrap">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>{{ t('blob_name') }}</th>
+          <th>{{ t('scope') }}</th>
+          <th>{{ t('content_type') }}</th>
+          <th>{{ t('size') }}</th>
+          <th>{{ t('created_at') }}</th>
+          <th>{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for blob in blobs %}
+        <tr{% if edit_blob and edit_blob.id == blob.id %} class="table-active"{% endif %}>
+          <td><code>{{ blob.name }}</code></td>
+          <td>
+            {% if blob.verification %}
+            {{ blob.verification.project.name }} / {{ blob.verification.name }}
+            {% elif blob.project %}
+            {{ blob.project.name }}
+            {% else %}
+            {{ t('scope_all') }}
+            {% endif %}
+          </td>
+          <td>{{ blob.content_type }}</td>
+          <td>{{ blob.size|filesize }}</td>
+          <td>{{ blob.created_at }}</td>
+          <td class="action-cell">
+            {{ icon_only(t('download'), 'bi-download', href=url_for('admin.blob_download', blob_id=blob.id)) }}
+            {{ icon_only(t('edit'), 'bi-pencil', href=url_for('admin.blob_edit', blob_id=blob.id)) }}
+            <form method="post" action="{{ url_for('admin.blob_delete', blob_id=blob.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_delete') }}" data-confirm-ok="{{ t('delete') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {{ icon_only(t('delete'), 'bi-trash', kind='outline-danger', submit=True) }}
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">{{ t('empty') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

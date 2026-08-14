@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn, icon_only, status_btn with context %}
+{% block title %}{{ t('keys_title') }} · {{ verification.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('admin.project_list') }}">{{ t('nav_projects') }}</a>
+      <i class="bi bi-chevron-right"></i>
+      <a href="{{ url_for('admin.verification_list', project_id=project.id) }}">{{ project.name }}</a>
+      <i class="bi bi-chevron-right"></i>
+      <a href="{{ url_for('admin.verification_edit', project_id=project.id, verification_id=verification.id) }}">{{ verification.name }}</a>
+    </p>
+    <h1 class="page-title"><i class="bi bi-key"></i> {{ t('keys_title') }}</h1>
+  </div>
+  <div class="head-actions">
+    {{ icon_btn(t('view_config'), 'bi-sliders', href=url_for('admin.verification_edit', project_id=project.id, verification_id=verification.id)) }}
+    {{ icon_btn(t('export_csv'), 'bi-filetype-csv', href=url_for('admin.key_export', project_id=project.id, verification_id=verification.id, fmt='csv')) }}
+    {{ icon_btn(t('export_txt'), 'bi-filetype-txt', href=url_for('admin.key_export', project_id=project.id, verification_id=verification.id, fmt='txt')) }}
+  </div>
+</div>
+
+<section class="panel">
+  <h2><i class="bi bi-collection"></i> {{ t('batch_issue') }}</h2>
+  <p class="help-text">{{ t('inherit_defaults') }}</p>
+  <form method="post" action="{{ url_for('admin.key_batch', project_id=project.id, verification_id=verification.id) }}" class="batch-grid">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label class="form-label" for="count">{{ t('count') }}</label>
+      <input class="form-control" id="count" name="count" type="number" min="1" max="500" value="10" required>
+    </div>
+    <div>
+      <label class="form-label" for="prefix">{{ t('prefix') }}</label>
+      <input class="form-control" id="prefix" name="prefix" value="VL">
+    </div>
+    <div>
+      <label class="form-label" for="length">{{ t('length') }}</label>
+      <input class="form-control" id="length" name="length" type="number" min="4" max="64" value="16">
+    </div>
+    <div>
+      <label class="form-label" for="charset">{{ t('charset') }}</label>
+      <input class="form-control" id="charset" name="charset" value="{{ charset }}">
+    </div>
+    <div>
+      <label class="form-label" for="ttl_seconds">{{ t('ttl_seconds') }}</label>
+      <input class="form-control" id="ttl_seconds" name="ttl_seconds" type="number" min="0" placeholder="{{ verification.default_ttl_seconds or t('unlimited') }}">
+    </div>
+    <div>
+      <label class="form-label" for="max_uses">{{ t('max_uses') }}</label>
+      <input class="form-control" id="max_uses" name="max_uses" type="text" inputmode="numeric" placeholder="{{ verification.default_max_uses if verification.default_max_uses is not none else 'infty' }}">
+    </div>
+    <div>
+      <label class="form-label" for="valid_from">{{ t('valid_from') }}</label>
+      <input class="form-control" id="valid_from" name="valid_from" type="datetime-local">
+    </div>
+    <div>
+      <label class="form-label" for="valid_until">{{ t('valid_until') }}</label>
+      <input class="form-control" id="valid_until" name="valid_until" type="datetime-local">
+    </div>
+    <div class="span-3">
+      <label class="form-label" for="note">{{ t('note') }}</label>
+      <input class="form-control" id="note" name="note">
+    </div>
+    <div class="batch-actions">
+      <button class="btn btn-primary" type="submit">
+        <i class="bi bi-send"></i><span>{{ t('issue') }}</span>
+      </button>
+    </div>
+  </form>
+</section>
+
+{% if batches %}
+<section class="panel">
+  <h2>{{ t('batch') }}</h2>
+  <div class="table-wrap">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>{{ t('count') }}</th>
+          <th>{{ t('prefix') }}</th>
+          <th>{{ t('created_at') }}</th>
+          <th>{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for batch in batches %}
+        <tr>
+          <td>{{ batch.id }}</td>
+          <td>{{ batch.count }}</td>
+          <td>{{ batch.prefix or t('none') }}</td>
+          <td>{{ batch.created_at }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.key_batch_revoke', project_id=project.id, verification_id=verification.id, batch_id=batch.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_revoke_batch') }}" data-confirm-ok="{{ t('revoke') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" type="submit">
+                <i class="bi bi-slash-circle"></i><span>{{ t('revoke_batch') }}</span>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <form method="get" class="filter-bar">
+    <div class="filter-field filter-field-grow">
+      <span>{{ t('search') }}</span>
+      <input class="form-control" name="q" value="{{ q }}" placeholder="{{ t('search') }}">
+    </div>
+    <div class="filter-field">
+      <span>{{ t('status') }}</span>
+      <select class="form-select" name="status">
+        <option value="">{{ t('all') }}</option>
+        <option value="active"{% if status == 'active' %} selected{% endif %}>{{ t('active') }}</option>
+        <option value="revoked"{% if status == 'revoked' %} selected{% endif %}>{{ t('revoked') }}</option>
+      </select>
+    </div>
+    <button class="btn btn-primary filter-submit" type="submit">
+      <i class="bi bi-search"></i><span>{{ t('filter') }}</span>
+    </button>
+  </form>
+  <div class="table-wrap">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>{{ t('key_code') }}</th>
+          <th>{{ t('status') }}</th>
+          <th>{{ t('used') }}</th>
+          <th>{{ t('ttl_seconds') }}</th>
+          <th>{{ t('hwid') }}</th>
+          <th>{{ t('batch') }}</th>
+          <th>{{ t('created_at') }}</th>
+          <th>{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for key in keys %}
+        <tr>
+          <td><code>{{ key.key_code }}</code></td>
+          <td class="status-cell">
+            {% if key.status == 'active' %}
+            {{ status_btn(t('active'), 'ok', url_for('admin.key_toggle', project_id=project.id, verification_id=verification.id, key_id=key.id)) }}
+            {% else %}
+            {{ status_btn(t('revoked'), 'bad', url_for('admin.key_toggle', project_id=project.id, verification_id=verification.id, key_id=key.id)) }}
+            {% endif %}
+          </td>
+          <td>{{ key.used_count }}{% if key.max_uses is not none %} / {{ key.max_uses }}{% else %} / ∞{% endif %}</td>
+          <td>{{ key.ttl_seconds if key.ttl_seconds is not none else t('unlimited') }}</td>
+          <td>{{ key.hwid or t('none') }}</td>
+          <td>{{ key.batch_id or t('none') }}</td>
+          <td>{{ key.created_at }}</td>
+          <td class="action-cell">
+            <button class="btn btn-sm btn-outline-secondary icon-only js-copy" type="button" data-copy="{{ key.key_code }}" title="{{ t('copy') }}" aria-label="{{ t('copy') }}">
+              <i class="bi bi-clipboard"></i>
+            </button>
+            {% if key.status == 'active' %}
+            <form method="post" action="{{ url_for('admin.key_revoke', project_id=project.id, verification_id=verification.id, key_id=key.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_revoke') }}" data-confirm-ok="{{ t('revoke') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {{ icon_only(t('revoke'), 'bi-slash-circle', kind='outline-danger', submit=True) }}
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty">{{ t('empty') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <div class="pager">
+    {% if page > 1 %}
+    <a class="btn btn-sm btn-outline-secondary" href="?page={{ page - 1 }}&q={{ q }}&status={{ status }}">
+      <i class="bi bi-chevron-left"></i><span>{{ t('page_prev') }}</span>
+    </a>
+    {% endif %}
+    <span>{{ page }} / {{ pages }} ({{ total }})</span>
+    {% if page < pages %}
+    <a class="btn btn-sm btn-outline-secondary" href="?page={{ page + 1 }}&q={{ q }}&status={{ status }}">
+      <i class="bi bi-chevron-right"></i><span>{{ t('page_next') }}</span>
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

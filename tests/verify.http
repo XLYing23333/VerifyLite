@@ -1,0 +1,21 @@
+@host = http://127.0.0.1:1921
+@project = demo1
+@verify = test1
+@key = VL-XXXX-XXXX-XXXX-XXXX
+@hwid = test-hwid-01
+
+### JSON verify
+POST {{host}}/api/v1/{{project}}/{{verify}}
+Content-Type: application/json
+
+{
+  "key": "{{key}}",
+  "hwid": "{{hwid}}"
+}
+
+### Form verify
+POST {{host}}/api/v1/{{project}}/{{verify}}
+Content-Type: application/x-www-form-urlencoded
+
+key={{key}}&hwid={{hwid}}
+ 

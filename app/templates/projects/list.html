@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn, icon_only, status_btn with context %}
+{% block title %}{{ t('projects_title') }} · {{ t('brand') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title"><i class="bi bi-folder2-open"></i> {{ t('projects_title') }}</h1>
+  {{ icon_btn(t('new_project'), 'bi-plus-lg', href=url_for('admin.project_new'), kind='primary') }}
+</div>
+<section class="panel">
+  <div class="table-wrap">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>{{ t('name') }}</th>
+          <th>{{ t('slug') }}</th>
+          <th>{{ t('status') }}</th>
+          <th>{{ t('verifications') }}</th>
+          <th>{{ t('created_at') }}</th>
+          <th>{{ t('actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects %}
+        <tr>
+          <td>
+            <a href="{{ url_for('admin.verification_list', project_id=project.id) }}">{{ project.name }}</a>
+          </td>
+          <td><code>{{ project.slug }}</code></td>
+          <td class="status-cell">
+            {% if project.enabled %}
+            {{ status_btn(t('enabled'), 'ok', url_for('admin.project_toggle', project_id=project.id)) }}
+            {% else %}
+            {{ status_btn(t('disabled'), 'off', url_for('admin.project_toggle', project_id=project.id)) }}
+            {% endif %}
+          </td>
+          <td>{{ project.verifications.count() }}</td>
+          <td>{{ project.created_at }}</td>
+          <td class="action-cell">
+            {{ icon_only(t('open'), 'bi-box-arrow-up-right', href=url_for('admin.verification_list', project_id=project.id), kind='outline-primary') }}
+            {{ icon_only(t('edit'), 'bi-pencil', href=url_for('admin.project_edit', project_id=project.id)) }}
+            <form method="post" action="{{ url_for('admin.project_delete', project_id=project.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_delete') }}" data-confirm-ok="{{ t('delete') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {{ icon_only(t('delete'), 'bi-trash', kind='outline-danger', submit=True) }}
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="empty">{{ t('empty') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

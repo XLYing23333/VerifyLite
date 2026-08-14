@@ -1,0 +1,38 @@
+{% macro icon_btn(label, icon, href=None, kind='outline-secondary', btn_type='button', extra='', size='sm', submit=False) -%}
+{%- if href -%}
+<a class="btn btn-{{ size }} btn-{{ kind }} {{ extra }}" href="{{ href }}">
+  <i class="bi {{ icon }}"></i><span>{{ label }}</span>
+</a>
+{%- else -%}
+<button class="btn btn-{{ size }} btn-{{ kind }} {{ extra }}" type="{{ 'submit' if submit else btn_type }}">
+  <i class="bi {{ icon }}"></i><span>{{ label }}</span>
+</button>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro icon_only(title, icon, href=None, kind='outline-secondary', extra='', submit=False) -%}
+{%- if href -%}
+<a class="btn btn-sm btn-{{ kind }} icon-only {{ extra }}" href="{{ href }}" title="{{ title }}" aria-label="{{ title }}">
+  <i class="bi {{ icon }}"></i>
+</a>
+{%- else -%}
+<button class="btn btn-sm btn-{{ kind }} icon-only {{ extra }}" type="{{ 'submit' if submit else 'button' }}" title="{{ title }}" aria-label="{{ title }}">
+  <i class="bi {{ icon }}"></i>
+</button>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro status_btn(label, kind='ok', action=None) -%}
+{%- if action -%}
+<form method="post" action="{{ action }}" class="inline-form status-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <button class="btn btn-sm status-btn status-{{ kind }}" type="submit" title="{{ t('toggle_status') }}">{{ label }}</button>
+</form>
+{%- else -%}
+<span class="btn btn-sm status-btn status-{{ kind }}">{{ label }}</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro result_btn(code) -%}
+{{ status_btn(t('res_' + code), 'ok' if code == 'success' else 'off') }}
+{%- endmacro %}

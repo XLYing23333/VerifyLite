@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn, icon_only, status_btn with context %}
+{% block title %}{{ project.name }} · {{ t('verifications') }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('admin.project_list') }}">{{ t('nav_projects') }}</a>
+      <i class="bi bi-chevron-right"></i>
+      {{ project.name }}
+    </p>
+    <h1 class="page-title"><i class="bi bi-diagram-3"></i> {{ t('verifications') }}</h1>
+  </div>
+  <div class="head-actions">
+    {{ icon_btn(t('edit_project'), 'bi-pencil', href=url_for('admin.project_edit', project_id=project.id)) }}
+    {{ icon_btn(t('new_verification'), 'bi-plus-lg', href=url_for('admin.verification_new', project_id=project.id), kind='primary') }}
+  </div>
+</div>
+<section class="panel">
+  <div class="table-wrap">
+    <table class="table align-middle">
+    <thead>
+      <tr>
+        <th>{{ t('name') }}</th>
+        <th>{{ t('slug') }}</th>
+        <th>{{ t('endpoint') }}</th>
+        <th>{{ t('status') }}</th>
+        <th>{{ t('bind_hwid') }}</th>
+        <th>{{ t('keys') }}</th>
+        <th>{{ t('actions') }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in verifications %}
+      <tr>
+        <td>{{ item.name }}</td>
+        <td><code>{{ item.slug }}</code></td>
+        <td><code>/api/v1/{{ project.slug }}/{{ item.slug }}</code></td>
+        <td class="status-cell">
+          {% if item.enabled %}
+          {{ status_btn(t('enabled'), 'ok', url_for('admin.verification_toggle', project_id=project.id, verification_id=item.id)) }}
+          {% else %}
+          {{ status_btn(t('disabled'), 'off', url_for('admin.verification_toggle', project_id=project.id, verification_id=item.id)) }}
+          {% endif %}
+        </td>
+        <td>{{ t('yes') if item.bind_hwid else t('no') }}</td>
+        <td>{{ item.keys.count() }}</td>
+        <td class="action-cell">
+          {{ icon_only(t('view_config'), 'bi-sliders', href=url_for('admin.verification_edit', project_id=project.id, verification_id=item.id), kind='outline-primary') }}
+          {{ icon_only(t('view_keys'), 'bi-key', href=url_for('admin.key_list', project_id=project.id, verification_id=item.id)) }}
+          {{ icon_only(t('view_logs'), 'bi-journal-text', href=url_for('admin.log_list', project_id=project.id, verification_id=item.id)) }}
+          <form method="post" action="{{ url_for('admin.verification_delete', project_id=project.id, verification_id=item.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_delete') }}" data-confirm-ok="{{ t('delete') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ icon_only(t('delete'), 'bi-trash', kind='outline-danger', submit=True) }}
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">{{ t('empty') }}</td></tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

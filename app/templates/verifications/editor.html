@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon_btn %}
+{% block title %}{{ t('edit_verification') }} · {{ verification.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="crumb">
+      <a href="{{ url_for('admin.project_list') }}">{{ t('nav_projects') }}</a>
+      <i class="bi bi-chevron-right"></i>
+      <a href="{{ url_for('admin.verification_list', project_id=project.id) }}">{{ project.name }}</a>
+      <i class="bi bi-chevron-right"></i>
+      {{ verification.name }}
+    </p>
+    <h1 class="page-title"><i class="bi bi-sliders"></i> {{ t('edit_verification') }}</h1>
+  </div>
+  <div class="head-actions">
+    {{ icon_btn(t('view_keys'), 'bi-key', href=url_for('admin.key_list', project_id=project.id, verification_id=verification.id)) }}
+    {{ icon_btn(t('view_logs'), 'bi-journal-text', href=url_for('admin.log_list', project_id=project.id, verification_id=verification.id)) }}
+  </div>
+</div>
+
+<p class="endpoint-line">
+  <i class="bi bi-link-45deg"></i>
+  <strong>{{ t('endpoint') }}:</strong>
+  <code>POST /api/v1/{{ project.slug }}/{{ verification.slug }}</code>
+</p>
+<p class="help-text">{{ t('template_help') }}</p>
+
+<form method="post" id="verify-config-form" class="stack-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <section class="panel meta-grid">
+    <div>
+      <label class="form-label" for="name">{{ t('name') }}</label>
+      <input class="form-control" id="name" name="name" value="{{ verification.name }}" required>
+    </div>
+    <div>
+      <label class="form-label" for="slug">{{ t('slug') }}</label>
+      <input class="form-control" id="slug" name="slug" value="{{ verification.slug }}" required>
+    </div>
+    <div>
+      <span class="form-label">{{ t('status') }}</span>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="enabled" name="enabled"{% if verification.enabled %} checked{% endif %}>
+        <label class="form-check-label" for="enabled">{{ t('enabled') }}</label>
+      </div>
+    </div>
+  </section>
+
+  <div class="dual-pane">
+    <section class="panel">
+      <h2>{{ t('gui_params') }}</h2>
+      <div class="form-check mb-3">
+        <input class="form-check-input js-sync" type="checkbox" id="bind_hwid"{% if config.bind_hwid %} checked{% endif %}>
+        <label class="form-check-label" for="bind_hwid">{{ t('bind_hwid') }}</label>
+      </div>
+      <label class="form-label" for="ttl_seconds">{{ t('ttl_seconds') }}</label>
+      <input class="form-control js-sync" id="ttl_seconds" type="number" min="0" placeholder="{{ t('no_limit_hint') }}" value="{{ config.defaults.ttl_seconds if config.defaults.ttl_seconds is not none else '' }}">
+      <label class="form-label" for="max_uses">{{ t('max_uses') }}</label>
+      <input class="form-control js-sync" id="max_uses" type="text" inputmode="numeric" placeholder="{{ t('no_limit_hint') }}" value="{{ config.defaults.max_uses if config.defaults.max_uses is not none else 'infty' }}">
+      <label class="form-label" for="valid_from">{{ t('valid_from') }}</label>
+      <input class="form-control js-sync" id="valid_from" type="datetime-local" value="">
+      <label class="form-label" for="valid_until">{{ t('valid_until') }}</label>
+      <input class="form-control js-sync" id="valid_until" type="datetime-local" value="">
+
+      <h3 class="subhead">{{ t('response_templates') }}</h3>
+      {% for code in result_codes %}
+      {% set resp = config.responses.get(code, {}) %}
+      <details class="resp-block" {% if code == 'success' %}open{% endif %}>
+        <summary>
+          <i class="bi bi-braces"></i>
+          <span>{{ t('res_' + code) }}</span>
+          <code class="resp-code">{{ code }}</code>
+        </summary>
+        <div class="resp-fields">
+          <label class="form-label" for="resp-{{ code }}-code">{{ t('code') }}</label>
+          <input class="form-control js-sync" id="resp-{{ code }}-code" type="number" value="{{ resp.get('code', 0) }}">
+          <label class="form-label" for="resp-{{ code }}-msg">{{ t('msg') }}</label>
+          <input class="form-control js-sync" id="resp-{{ code }}-msg" value="{{ resp.get('msg', '') }}">
+          <div class="extra-head">
+            <label class="form-label mb-0">{{ t('extra_json') }}</label>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.blob_list') }}">
+              <i class="bi bi-archive"></i><span>{{ t('nav_blobs') }}</span>
+            </a>
+          </div>
+          <p class="help-text">{{ t('extra_blob_help') }}</p>
+          <div class="extra-gui" data-code="{{ code }}"></div>
+          <button class="btn btn-sm btn-outline-secondary js-extra-add" type="button" data-code="{{ code }}">
+            <i class="bi bi-plus-lg"></i><span>{{ t('extra_add') }}</span>
+          </button>
+        </div>
+      </details>
+      {% endfor %}
+    </section>
+
+    <div class="editor-side">
+      <section class="panel json-panel">
+        <h2>{{ t('json_preview') }}</h2>
+        <p id="json-error" class="json-error d-none">{{ t('invalid_json') }}</p>
+        <textarea class="form-control font-mono json-editor" id="config_json" name="config_json" rows="18">{{ config_json }}</textarea>
+      </section>
+      {% set api_url = url_for('api.verify', project_slug=project.slug, verify_slug=verification.slug, _external=True) %}
+      {% set api_body = '{"key":"VL-XXXX-XXXX","hwid":"your-machine-id"}' %}
+      <section class="panel api-docs">
+        <h2><i class="bi bi-code-slash"></i> {{ t('api_docs_title') }}</h2>
+        <div class="api-endpoint">
+          <span class="api-method">POST</span>
+          <code id="api-docs-url">{{ api_url }}</code>
+          <button class="btn btn-sm btn-outline-secondary icon-only js-copy" type="button" data-copy-from="api-docs-url" title="{{ t('copy') }}" aria-label="{{ t('copy') }}">
+            <i class="bi bi-clipboard"></i>
+          </button>
+        </div>
+        <dl class="api-fields">
+          <div>
+            <dt><code>key</code> <span>{{ t('api_docs_required') }}</span></dt>
+            <dd>{{ t('api_docs_key_help') }}</dd>
+          </div>
+          <div>
+            <dt><code>hwid</code> <span>{{ t('api_docs_required') if config.bind_hwid else t('api_docs_optional') }}</span></dt>
+            <dd>{{ t('api_docs_hwid_on') if config.bind_hwid else t('api_docs_hwid_off') }}</dd>
+          </div>
+        </dl>
+        <p class="help-text">{{ t('api_docs_formats') }}</p>
+        <div class="api-sample-head">
+          <span>{{ t('api_docs_example') }}</span>
+          <button class="btn btn-sm btn-outline-secondary icon-only js-copy" type="button" data-copy-from="api-docs-curl" title="{{ t('copy') }}" aria-label="{{ t('copy') }}">
+            <i class="bi bi-clipboard"></i>
+          </button>
+        </div>
+        <pre class="api-sample font-mono" id="api-docs-curl">curl -s -X POST '{{ api_url }}' \
+  -H 'Content-Type: application/json' \
+  -d '{{ api_body }}'</pre>
+        <h3 class="subhead">{{ t('api_docs_response') }}</h3>
+        <p class="help-text">{{ t('api_docs_response_help') }}</p>
+        <p class="api-results-label">{{ t('api_docs_results') }}</p>
+        <div class="api-results">
+          {% for code in result_codes %}
+          <span class="api-result" title="{{ t('res_' + code) }}"><code>{{ code }}</code>{{ t('res_' + code) }}</span>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="sticky-actions">
+    <button class="btn btn-primary" type="submit">
+      <i class="bi bi-check2"></i><span>{{ t('save') }}</span>
+    </button>
+    {{ icon_btn(t('cancel'), 'bi-x-lg', href=url_for('admin.verification_list', project_id=project.id)) }}
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dual-editor.js', v='20260814c') }}"></script>
+<script>
+  window.VerifyLiteDual.init({
+    resultCodes: {{ result_codes|tojson }},
+    validFrom: {{ (config.defaults.valid_from or '')|tojson }},
+    validUntil: {{ (config.defaults.valid_until or '')|tojson }},
+    extras: {{ (extras or {})|tojson }},
+    blobs: {{ blobs|map(attribute='name')|list|tojson }},
+    labels: {
+      key: {{ t('extra_key')|tojson }},
+      value: {{ t('extra_value')|tojson }},
+      kind: {{ t('extra_kind')|tojson }},
+      text: {{ t('extra_kind_text')|tojson }},
+      number: {{ t('extra_kind_number')|tojson }},
+      blob: {{ t('extra_kind_blob')|tojson }},
+      pickBlob: {{ t('extra_pick_blob')|tojson }},
+      remove: {{ t('extra_remove')|tojson }},
+      noBlobs: {{ t('extra_no_blobs')|tojson }}
+    }
+  });
+</script>
+{% endblock %}
