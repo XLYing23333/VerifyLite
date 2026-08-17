@@ -37,6 +37,7 @@ from app.auth import (
 from app.defaults import (
     DEFAULT_CONFIG,
     DEFAULT_KEY_CHARSET,
+    DEFAULT_VALID_UNTIL,
     KEY_STATUS_ACTIVE,
     KEY_STATUS_REVOKED,
     LANG_EN,
@@ -113,21 +114,72 @@ def _valid_slug(value):
     return bool(value and SLUG_RE.match(value))
 
 
-def _int_or_none(raw):
-    """Parse an optional integer form field.
+def _datetime_local_value(value, fallback=None):
+    """Format a datetime for a ``datetime-local`` input.
 
     Args:
-        raw: Raw form value.
+        value: Datetime, ISO string, or ``None``.
+        fallback: Used when ``value`` is empty.
 
     Returns:
-        int | None: Parsed integer, or ``None`` when empty.
+        str: ``YYYY-MM-DDTHH:MM``, or empty.
     """
-    if raw in (None, ""):
-        return None
-    try:
-        return int(raw)
-    except (TypeError, ValueError):
-        return None
+    parsed = parse_iso_datetime(value) if value else None
+    if parsed is None:
+        parsed = parse_iso_datetime(fallback) if fallback else None
+    if parsed is None:
+        return ""
+    return parsed.strftime("%Y-%m-%dT%H:%M")
+
+
+def _null_verify_log_keys(key_ids):
+    """Detach verify logs from license keys before those keys are deleted.
+
+    Args:
+        key_ids: License key primary keys.
+    """
+    ids = [item for item in key_ids if item]
+    if not ids:
+        return
+    VerifyLog.query.filter(VerifyLog.key_id.in_(ids)).update(
+        {VerifyLog.key_id: None},
+        synchronize_session=False,
+    )
+
+
+def _license_key_ids_for_verification(verification_id):
+    """List license-key ids owned by a verification scheme.
+
+    Args:
+        verification_id: Verification primary key.
+
+    Returns:
+        list: Integer ids.
+    """
+    return [
+        row[0]
+        for row in db.session.query(LicenseKey.id)
+        .filter(LicenseKey.verification_id == verification_id)
+        .all()
+    ]
+
+
+def _license_key_ids_for_project(project_id):
+    """List license-key ids under every scheme in a project.
+
+    Args:
+        project_id: Project primary key.
+
+    Returns:
+        list: Integer ids.
+    """
+    return [
+        row[0]
+        for row in db.session.query(LicenseKey.id)
+        .join(Verification, LicenseKey.verification_id == Verification.id)
+        .filter(Verification.project_id == project_id)
+        .all()
+    ]
 
 
 def _load_project(project_id):
@@ -659,7 +711,7 @@ def project_new():
         project = Project(name=name, slug=slug, description=description, enabled=enabled)
         db.session.add(project)
         db.session.commit()
-        flash(t("created"), "success")
+        flash(t("project_created", name=project.name), "success")
         return redirect(url_for("admin.verification_list", project_id=project.id))
     return render_template("projects/form.html", project=None)
 
@@ -691,7 +743,7 @@ def project_edit(project_id):
         project.name = name
         project.slug = slug
         db.session.commit()
-        flash(t("saved"), "success")
+        flash(t("project_saved", name=project.name), "success")
         return redirect(url_for("admin.verification_list", project_id=project.id))
     return render_template("projects/form.html", project=project)
 
@@ -708,9 +760,11 @@ def project_delete(project_id):
         Response: Redirect to the project list.
     """
     project = _load_project(project_id)
+    name = project.name
+    _null_verify_log_keys(_license_key_ids_for_project(project.id))
     db.session.delete(project)
     db.session.commit()
-    flash(t("deleted"), "success")
+    flash(t("project_deleted", name=name), "success")
     return redirect(url_for("admin.project_list"))
 
 
@@ -728,7 +782,8 @@ def project_toggle(project_id):
     project = _load_project(project_id)
     project.enabled = not project.enabled
     db.session.commit()
-    flash(t("saved"), "success")
+    key = "project_enabled" if project.enabled else "project_disabled"
+    flash(t(key, name=project.name), "success")
     return _redirect_referrer(url_for("admin.project_list"))
 
 
@@ -785,7 +840,7 @@ def verification_new(project_id):
         sync_columns_from_config(verification)
         db.session.add(verification)
         db.session.commit()
-        flash(t("created"), "success")
+        flash(t("verification_created", name=verification.name), "success")
         return redirect(
             url_for(
                 "admin.verification_edit",
@@ -852,7 +907,7 @@ def verification_edit(project_id, verification_id):
         verification.config_json = json.dumps(normalize_config(parsed), ensure_ascii=False, indent=2)
         sync_columns_from_config(verification)
         db.session.commit()
-        flash(t("saved"), "success")
+        flash(t("verification_saved", name=verification.name), "success")
         return redirect(
             url_for(
                 "admin.verification_edit",
@@ -882,9 +937,11 @@ def verification_delete(project_id, verification_id):
         Response: Redirect to the scheme list.
     """
     project, verification = _load_pair(project_id, verification_id)
+    name = verification.name
+    _null_verify_log_keys(_license_key_ids_for_verification(verification.id))
     db.session.delete(verification)
     db.session.commit()
-    flash(t("deleted"), "success")
+    flash(t("verification_deleted", name=name), "success")
     return redirect(url_for("admin.verification_list", project_id=project.id))
 
 
@@ -903,7 +960,8 @@ def verification_toggle(project_id, verification_id):
     project, verification = _load_pair(project_id, verification_id)
     verification.enabled = not verification.enabled
     db.session.commit()
-    flash(t("saved"), "success")
+    key = "verification_enabled" if verification.enabled else "verification_disabled"
+    flash(t(key, name=verification.name), "success")
     return _redirect_referrer(
         url_for("admin.verification_list", project_id=project.id)
     )
@@ -955,6 +1013,10 @@ def key_list(project_id, verification_id):
         charset=DEFAULT_KEY_CHARSET,
         q=request.args.get("q", ""),
         status=request.args.get("status", ""),
+        valid_from_value=_datetime_local_value(verification.default_valid_from),
+        valid_until_value=_datetime_local_value(
+            verification.default_valid_until, DEFAULT_VALID_UNTIL
+        ),
     )
 
 
@@ -974,7 +1036,7 @@ def key_batch(project_id, verification_id):
     max_batch = current_app.config["MAX_BATCH_KEYS"]
     try:
         count = int(request.form.get("count") or 0)
-        length = int(request.form.get("length") or 16)
+        length = int(request.form.get("length") or 64)
     except ValueError:
         abort(400)
     count = max(1, min(count, max_batch))
@@ -982,23 +1044,21 @@ def key_batch(project_id, verification_id):
     prefix = (request.form.get("prefix") or "").strip()
     charset = (request.form.get("charset") or DEFAULT_KEY_CHARSET).strip() or DEFAULT_KEY_CHARSET
     note = (request.form.get("note") or "").strip()
-    ttl = _int_or_none(request.form.get("ttl_seconds"))
     raw_uses = request.form.get("max_uses")
-    if ttl is None:
-        ttl = verification.default_ttl_seconds
     if raw_uses in (None, ""):
         max_uses = verification.default_max_uses
     else:
         max_uses = parse_unlimited_int(raw_uses)
     valid_from = parse_iso_datetime(request.form.get("valid_from")) or verification.default_valid_from
-    valid_until = parse_iso_datetime(request.form.get("valid_until")) or verification.default_valid_until
+    valid_until = parse_iso_datetime(request.form.get("valid_until"))
+    if valid_until is None:
+        valid_until = verification.default_valid_until or parse_iso_datetime(DEFAULT_VALID_UNTIL)
     batch = KeyBatch(
         verification_id=verification.id,
         count=count,
         prefix=prefix,
         key_length=length,
         charset=charset,
-        ttl_seconds=ttl,
         max_uses=max_uses,
         valid_from=valid_from,
         valid_until=valid_until,
@@ -1022,7 +1082,6 @@ def key_batch(project_id, verification_id):
             batch_id=batch.id,
             key_code=code,
             status=KEY_STATUS_ACTIVE,
-            ttl_seconds=ttl,
             max_uses=max_uses,
             valid_from=valid_from,
             valid_until=valid_until,
@@ -1071,7 +1130,6 @@ def key_export(project_id, verification_id):
         [
             "key_code",
             "status",
-            "ttl_seconds",
             "max_uses",
             "used_count",
             "valid_from",
@@ -1087,7 +1145,6 @@ def key_export(project_id, verification_id):
             [
                 item.key_code,
                 item.status,
-                item.ttl_seconds or "",
                 item.max_uses if item.max_uses is not None else "",
                 item.used_count,
                 item.valid_from or "",
@@ -1128,7 +1185,7 @@ def key_revoke(project_id, verification_id, key_id):
         abort(404)
     key.status = KEY_STATUS_REVOKED
     db.session.commit()
-    flash(t("saved"), "success")
+    flash(t("key_revoked", code=key.key_code), "success")
     return redirect(
         url_for("admin.key_list", project_id=project.id, verification_id=verification.id)
     )
@@ -1155,10 +1212,12 @@ def key_toggle(project_id, verification_id, key_id):
         abort(404)
     if key.status == KEY_STATUS_REVOKED:
         key.status = KEY_STATUS_ACTIVE
+        message = t("key_activated", code=key.key_code)
     else:
         key.status = KEY_STATUS_REVOKED
+        message = t("key_revoked", code=key.key_code)
     db.session.commit()
-    flash(t("saved"), "success")
+    flash(message, "success")
     return _redirect_referrer(
         url_for("admin.key_list", project_id=project.id, verification_id=verification.id)
     )
@@ -1183,11 +1242,79 @@ def key_batch_revoke(project_id, verification_id, batch_id):
     batch = db.session.get(KeyBatch, batch_id)
     if batch is None or batch.verification_id != verification.id:
         abort(404)
-    LicenseKey.query.filter_by(batch_id=batch.id).update(
-        {LicenseKey.status: KEY_STATUS_REVOKED}
+    n = LicenseKey.query.filter_by(batch_id=batch.id).update(
+        {LicenseKey.status: KEY_STATUS_REVOKED},
+        synchronize_session=False,
     )
     db.session.commit()
-    flash(t("saved"), "success")
+    flash(t("batch_revoked", id=batch.id, n=n), "success")
+    return redirect(
+        url_for("admin.key_list", project_id=project.id, verification_id=verification.id)
+    )
+
+
+@admin_bp.post(
+    "/projects/<int:project_id>/verifications/<int:verification_id>/keys/<int:key_id>/delete"
+)
+@login_required
+def key_delete(project_id, verification_id, key_id):
+    """Permanently delete a single license key.
+
+    Args:
+        project_id: Project primary key.
+        verification_id: Verification primary key.
+        key_id: License key primary key.
+
+    Returns:
+        Response: Redirect to the key list.
+    """
+    project, verification = _load_pair(project_id, verification_id)
+    key = db.session.get(LicenseKey, key_id)
+    if key is None or key.verification_id != verification.id:
+        abort(404)
+    code = key.key_code
+    _null_verify_log_keys([key.id])
+    db.session.delete(key)
+    db.session.commit()
+    flash(t("key_deleted", code=code), "success")
+    return redirect(
+        url_for("admin.key_list", project_id=project.id, verification_id=verification.id)
+    )
+
+
+@admin_bp.post(
+    "/projects/<int:project_id>/verifications/<int:verification_id>/keys/batch/<int:batch_id>/delete"
+)
+@login_required
+def key_batch_delete(project_id, verification_id, batch_id):
+    """Delete a batch record and every key issued in it.
+
+    Args:
+        project_id: Project primary key.
+        verification_id: Verification primary key.
+        batch_id: Batch primary key.
+
+    Returns:
+        Response: Redirect to the key list.
+    """
+    project, verification = _load_pair(project_id, verification_id)
+    batch = db.session.get(KeyBatch, batch_id)
+    if batch is None or batch.verification_id != verification.id:
+        abort(404)
+    key_ids = [
+        row[0]
+        for row in db.session.query(LicenseKey.id).filter_by(batch_id=batch.id).all()
+    ]
+    n = len(key_ids)
+    batch_pk = batch.id
+    _null_verify_log_keys(key_ids)
+    if key_ids:
+        LicenseKey.query.filter(LicenseKey.id.in_(key_ids)).delete(
+            synchronize_session=False
+        )
+    db.session.delete(batch)
+    db.session.commit()
+    flash(t("batch_deleted", id=batch_pk, n=n), "success")
     return redirect(
         url_for("admin.key_list", project_id=project.id, verification_id=verification.id)
     )
@@ -1249,7 +1376,7 @@ def blob_list():
         )
         db.session.add(blob)
         db.session.commit()
-        flash(t("created"), "success")
+        flash(t("blob_created", name=blob.name), "success")
         return redirect(url_for("admin.blob_list"))
     return _render_blobs()
 
@@ -1286,7 +1413,7 @@ def blob_edit(blob_id):
             blob.size = len(payload)
             blob.content_type = content_type
         db.session.commit()
-        flash(t("saved"), "success")
+        flash(t("blob_saved", name=blob.name), "success")
         return redirect(url_for("admin.blob_list"))
     return _render_blobs(edit_blob=blob)
 
@@ -1327,7 +1454,8 @@ def blob_delete(blob_id):
     blob = db.session.get(BlobObject, blob_id)
     if blob is None:
         abort(404)
+    name = blob.name
     db.session.delete(blob)
     db.session.commit()
-    flash(t("deleted"), "success")
+    flash(t("blob_deleted", name=name), "success")
     return redirect(url_for("admin.blob_list"))

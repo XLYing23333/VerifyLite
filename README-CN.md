@@ -25,7 +25,7 @@
 
 VerifyLite 是一个小巧、可自托管的许可证服务：对客户端提供公开 JSON 校验接口，对管理员提供服务端渲染的管理后台，用于管理项目、验证方案、密钥、回复模板和调用日志。全部数据使用 SQLite 保存，也可以用 BLOB 存储在校验成功后返回的附件。
 
-> 默认监听端口：**1921**
+> 默认监听端口：**22222**
 
 ## 目录
 
@@ -48,8 +48,8 @@ VerifyLite 是一个小巧、可自托管的许可证服务：对客户端提供
 
 - 公开校验接口，支持 JSON 或 `application/x-www-form-urlencoded`
 - 参数 GUI 与 JSON 预览双向同步
-- 批量发卡、TXT/CSV 导出、单钥与按批次吊销
-- TTL、最大次数、`valid_from` / `valid_until` 和可选 HWID 绑定
+- 批量发卡、TXT/CSV 导出、单钥与按批次吊销或删除
+- 失效日期、最大次数、可选 `valid_from` 和可选 HWID 绑定
 - 用量看板与方案级调用日志
 - 可选 BLOB 对象，成功模板可使用 `{{blob_url:name}}`
 - 管理后台支持 English / 简中，以及 System / Dark / WeLight 主题
@@ -94,7 +94,7 @@ chmod +x scripts/start.sh
 ./scripts/start.sh
 ```
 
-打开 [http://127.0.0.1:1921](http://127.0.0.1:1921)。首次运行会将 [`.env.example`](.env.example) 复制为 `.env` 并生成 `SECRET_KEY`；第一次访问浏览器会进入初始化页，请设置管理员用户名和至少 8 位的密码。
+打开 [http://127.0.0.1:22222](http://127.0.0.1:22222)。首次运行会将 [`.env.example`](.env.example) 复制为 `.env` 并生成 `SECRET_KEY`；第一次访问浏览器会进入初始化页，请设置管理员用户名和至少 8 位的密码。
 
 生产模式（Gunicorn）：
 
@@ -130,15 +130,15 @@ docker compose up -d --build
 POST /api/v1/{project_slug}/{verify_slug}
 Content-Type: application/json
 
-{"key":"VL-XXXX-XXXX","hwid":"optional-machine-id"}
+{"key":"VLYOURLICENSEKEY","hwid":"optional-machine-id"}
 ```
 
 也接受包含 `key` 与 `hwid` 的表单请求。
 
 ```bash
-curl -s -X POST http://127.0.0.1:1921/api/v1/<project>/<verify> \
+curl -s -X POST http://127.0.0.1:22222/api/v1/<project>/<verify> \
   -H 'Content-Type: application/json' \
-  -d '{"key":"VL-XXXX-XXXX","hwid":"optional-machine-id"}'
+  -d '{"key":"VLYOURLICENSEKEY","hwid":"optional-machine-id"}'
 ```
 
 设计好的回复统一使用 HTTP `200`；客户端应读取 JSON 中的 `code` 字段。
@@ -155,7 +155,7 @@ curl -s -X POST http://127.0.0.1:1921/api/v1/<project>/<verify> \
 | `{{project}}` | 项目 slug |
 | `{{verification}}` | 验证方案 slug |
 | `{{now}}` | 服务器 UTC 时间 |
-| `{{blob_url:name}}` | 校验成功后签发的短时下载地址 |
+| `{{blob_url:name}}` | 校验成功后签发的下载地址（长期有效） |
 
 ## 校验规则
 
@@ -163,11 +163,10 @@ curl -s -X POST http://127.0.0.1:1921/api/v1/<project>/<verify> \
 
 1. 项目与方案存在且已启用
 2. 密钥存在且未吊销
-3. `valid_from` / `valid_until` 时间窗
-4. TTL（从首次成功使用起算）
-5. 使用次数（`used_count < max_uses`；`max_uses` 可为 `null` / `infty` 表示不限制）
-6. 若开启 HWID：首次成功锁定，之后必须一致
-7. 成功：`used_count + 1`，必要时写入 HWID，并渲染 `success`
+3. `valid_from` / `valid_until` 时间窗（`valid_until` 即失效日期）
+4. 使用次数（`used_count < max_uses`；`max_uses` 可为 `null` / `infty` 表示不限制）
+5. 若开启 HWID：首次成功锁定，之后必须一致
+6. 成功：`used_count + 1`，必要时写入 HWID，并渲染 `success`
 
 失败模板：`invalid_key`、`not_yet_valid`、`expired`、`exhausted`、`hwid_mismatch`、`disabled`。
 
@@ -177,8 +176,8 @@ curl -s -X POST http://127.0.0.1:1921/api/v1/<project>/<verify> \
 
 | 变量 | 说明 |
 | --- | --- |
-| `PORT` | 监听端口（默认 `1921`） |
-| `SECRET_KEY` | Session、CSRF、BLOB 短链签名密钥 |
+| `PORT` | 监听端口（默认 `22222`） |
+| `SECRET_KEY` | Session、CSRF、BLOB 下载链接签名密钥 |
 | `DATA_DIR` | SQLite 与数据目录 |
 | `MAX_BLOB_SIZE` | 上传大小上限（默认与上限均为 `1000000000` 字节，即 1 GB） |
 | `GUNICORN_WORKERS` | 生产 worker 数（SQLite 建议 `1`） |
@@ -189,7 +188,7 @@ curl -s -X POST http://127.0.0.1:1921/api/v1/<project>/<verify> \
 ```text
 app/
   blueprints/admin.py   管理端 SSR
-  blueprints/api.py     公开校验 API 与 BLOB 短链
+  blueprints/api.py     公开校验 API 与 BLOB 下载链接
   verify_engine.py      纯校验与安全模板渲染
   models.py             SQLAlchemy 模型
   templates/            Jinja 页面
@@ -205,5 +204,5 @@ docker-compose.yml
 - 对外部署前务必修改 `SECRET_KEY`。管理员密码以哈希形式存在 SQLite 中，不写在 `.env`。
 - 密钥明文存储，以便导出分发。
 - 日志列表会遮罩密钥；数据库仍保存提交值。
-- BLOB 下载链接为短时签名 token，仅在校验成功后签发。
+- BLOB 下载链接为签名 token，仅在校验成功后签发，且长期有效。
 - 没有 TLS 和强密码时，不要把管理端暴露到公网。

@@ -27,7 +27,7 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div>
       <label class="form-label" for="count">{{ t('count') }}</label>
-      <input class="form-control" id="count" name="count" type="number" min="1" max="500" value="10" required>
+      <input class="form-control" id="count" name="count" type="number" min="1" max="500" value="1" required>
     </div>
     <div>
       <label class="form-label" for="prefix">{{ t('prefix') }}</label>
@@ -35,27 +35,23 @@
     </div>
     <div>
       <label class="form-label" for="length">{{ t('length') }}</label>
-      <input class="form-control" id="length" name="length" type="number" min="4" max="64" value="16">
+      <input class="form-control" id="length" name="length" type="number" min="4" max="64" value="64">
     </div>
     <div>
       <label class="form-label" for="charset">{{ t('charset') }}</label>
       <input class="form-control" id="charset" name="charset" value="{{ charset }}">
     </div>
     <div>
-      <label class="form-label" for="ttl_seconds">{{ t('ttl_seconds') }}</label>
-      <input class="form-control" id="ttl_seconds" name="ttl_seconds" type="number" min="0" placeholder="{{ verification.default_ttl_seconds or t('unlimited') }}">
-    </div>
-    <div>
       <label class="form-label" for="max_uses">{{ t('max_uses') }}</label>
-      <input class="form-control" id="max_uses" name="max_uses" type="text" inputmode="numeric" placeholder="{{ verification.default_max_uses if verification.default_max_uses is not none else 'infty' }}">
+      <input class="form-control" id="max_uses" name="max_uses" type="text" inputmode="numeric" value="infty" placeholder="{{ t('no_limit_hint') }}">
     </div>
     <div>
       <label class="form-label" for="valid_from">{{ t('valid_from') }}</label>
-      <input class="form-control" id="valid_from" name="valid_from" type="datetime-local">
+      <input class="form-control" id="valid_from" name="valid_from" type="datetime-local" value="{{ valid_from_value }}">
     </div>
     <div>
       <label class="form-label" for="valid_until">{{ t('valid_until') }}</label>
-      <input class="form-control" id="valid_until" name="valid_until" type="datetime-local">
+      <input class="form-control" id="valid_until" name="valid_until" type="datetime-local" value="{{ valid_until_value }}">
     </div>
     <div class="span-3">
       <label class="form-label" for="note">{{ t('note') }}</label>
@@ -90,12 +86,14 @@
           <td>{{ batch.count }}</td>
           <td>{{ batch.prefix or t('none') }}</td>
           <td>{{ batch.created_at }}</td>
-          <td>
+          <td class="action-cell">
             <form method="post" action="{{ url_for('admin.key_batch_revoke', project_id=project.id, verification_id=verification.id, batch_id=batch.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_revoke_batch') }}" data-confirm-ok="{{ t('revoke') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm btn-outline-danger" type="submit">
-                <i class="bi bi-slash-circle"></i><span>{{ t('revoke_batch') }}</span>
-              </button>
+              {{ icon_only(t('revoke_batch'), 'bi-slash-circle', kind='outline-danger', submit=True) }}
+            </form>
+            <form method="post" action="{{ url_for('admin.key_batch_delete', project_id=project.id, verification_id=verification.id, batch_id=batch.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_delete_batch') }}" data-confirm-ok="{{ t('delete') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {{ icon_only(t('delete_batch'), 'bi-trash', kind='outline-danger', submit=True) }}
             </form>
           </td>
         </tr>
@@ -131,7 +129,7 @@
           <th>{{ t('key_code') }}</th>
           <th>{{ t('status') }}</th>
           <th>{{ t('used') }}</th>
-          <th>{{ t('ttl_seconds') }}</th>
+          <th>{{ t('valid_until') }}</th>
           <th>{{ t('hwid') }}</th>
           <th>{{ t('batch') }}</th>
           <th>{{ t('created_at') }}</th>
@@ -141,7 +139,7 @@
       <tbody>
         {% for key in keys %}
         <tr>
-          <td><code>{{ key.key_code }}</code></td>
+          <td><code class="key-code">{{ key.key_code }}</code></td>
           <td class="status-cell">
             {% if key.status == 'active' %}
             {{ status_btn(t('active'), 'ok', url_for('admin.key_toggle', project_id=project.id, verification_id=verification.id, key_id=key.id)) }}
@@ -150,7 +148,7 @@
             {% endif %}
           </td>
           <td>{{ key.used_count }}{% if key.max_uses is not none %} / {{ key.max_uses }}{% else %} / ∞{% endif %}</td>
-          <td>{{ key.ttl_seconds if key.ttl_seconds is not none else t('unlimited') }}</td>
+          <td>{% if key.valid_until %}{{ key.valid_until.strftime('%Y-%m-%d %H:%M') }}{% else %}{{ t('unlimited') }}{% endif %}</td>
           <td>{{ key.hwid or t('none') }}</td>
           <td>{{ key.batch_id or t('none') }}</td>
           <td>{{ key.created_at }}</td>
@@ -164,6 +162,10 @@
               {{ icon_only(t('revoke'), 'bi-slash-circle', kind='outline-danger', submit=True) }}
             </form>
             {% endif %}
+            <form method="post" action="{{ url_for('admin.key_delete', project_id=project.id, verification_id=verification.id, key_id=key.id) }}" class="inline-form js-confirm-form" data-confirm="{{ t('confirm_delete_key') }}" data-confirm-ok="{{ t('delete') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {{ icon_only(t('delete'), 'bi-trash', kind='outline-danger', submit=True) }}
+            </form>
           </td>
         </tr>
         {% else %}

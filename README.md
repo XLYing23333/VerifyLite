@@ -25,7 +25,7 @@
 
 VerifyLite is a small, self-hosted license server. It exposes a public JSON endpoint for clients and a server-rendered admin console for managing projects, verification schemes, keys, response templates, and usage logs. Everything is backed by SQLite, with optional BLOB storage for files returned after a successful verification.
 
-> Default listen port: **1921**
+> Default listen port: **22222**
 
 ## Contents
 
@@ -48,8 +48,8 @@ VerifyLite is a small, self-hosted license server. It exposes a public JSON endp
 
 - Public verify endpoint with JSON or `application/x-www-form-urlencoded` bodies
 - Dual editor with a parameter GUI and synchronized JSON preview
-- Batch key issuance, TXT/CSV export, single-key and batch revoke
-- TTL, maximum uses, `valid_from` / `valid_until`, and optional HWID binding
+- Batch key issuance, TXT/CSV export, single-key and batch revoke or delete
+- Expiry date, maximum uses, optional `valid_from`, and optional HWID binding
 - Usage dashboard and per-scheme call logs
 - Optional BLOB objects referenced with `{{blob_url:name}}` in success templates
 - English and Simplified Chinese admin UI, plus system/dark/WeLight themes
@@ -94,7 +94,7 @@ chmod +x scripts/start.sh
 ./scripts/start.sh
 ```
 
-Open [http://127.0.0.1:1921](http://127.0.0.1:1921). On the first run, the script copies [`.env.example`](.env.example) to `.env` and generates `SECRET_KEY`. The first browser visit opens setup, where you choose an admin username and a password of at least eight characters.
+Open [http://127.0.0.1:22222](http://127.0.0.1:22222). On the first run, the script copies [`.env.example`](.env.example) to `.env` and generates `SECRET_KEY`. The first browser visit opens setup, where you choose an admin username and a password of at least eight characters.
 
 For production with Gunicorn:
 
@@ -130,15 +130,15 @@ The top bar includes browser history controls, **EN / 简中** language switchin
 POST /api/v1/{project_slug}/{verify_slug}
 Content-Type: application/json
 
-{"key":"VL-XXXX-XXXX","hwid":"optional-machine-id"}
+{"key":"VLYOURLICENSEKEY","hwid":"optional-machine-id"}
 ```
 
 Form bodies with `key` and `hwid` are also accepted.
 
 ```bash
-curl -s -X POST http://127.0.0.1:1921/api/v1/<project>/<verify> \
+curl -s -X POST http://127.0.0.1:22222/api/v1/<project>/<verify> \
   -H 'Content-Type: application/json' \
-  -d '{"key":"VL-XXXX-XXXX","hwid":"optional-machine-id"}'
+  -d '{"key":"VLYOURLICENSEKEY","hwid":"optional-machine-id"}'
 ```
 
 Designed replies use HTTP `200`; clients should inspect the `code` field in the JSON body.
@@ -155,7 +155,7 @@ Designed replies use HTTP `200`; clients should inspect the `code` field in the 
 | `{{project}}` | Project slug |
 | `{{verification}}` | Verification slug |
 | `{{now}}` | Server UTC time |
-| `{{blob_url:name}}` | Short-lived download URL issued after a successful verify |
+| `{{blob_url:name}}` | Download URL issued after a successful verify (does not expire) |
 
 ## Verification rules
 
@@ -163,11 +163,10 @@ Checks run in this order:
 
 1. Project and verification exist and are enabled
 2. Key exists and is not revoked
-3. `valid_from` / `valid_until` window
-4. TTL, counted from first successful use
-5. Usage count (`used_count < max_uses`; `max_uses` may be `null` / `infty` for unlimited)
-6. HWID, when enabled: lock on first success and require a match thereafter
-7. On success: increment `used_count`, persist HWID if needed, and render `success`
+3. `valid_from` / `valid_until` window (`valid_until` is the expiry date)
+4. Usage count (`used_count < max_uses`; `max_uses` may be `null` / `infty` for unlimited)
+5. HWID, when enabled: lock on first success and require a match thereafter
+6. On success: increment `used_count`, persist HWID if needed, and render `success`
 
 Failure templates are `invalid_key`, `not_yet_valid`, `expired`, `exhausted`, `hwid_mismatch`, and `disabled`.
 
@@ -177,7 +176,7 @@ See [`.env.example`](.env.example):
 
 | Variable | Description |
 | --- | --- |
-| `PORT` | Listen port (default `1921`) |
+| `PORT` | Listen port (default `22222`) |
 | `SECRET_KEY` | Session, CSRF, and BLOB-token signing key |
 | `DATA_DIR` | SQLite and data directory |
 | `MAX_BLOB_SIZE` | Maximum upload size (default and cap `1000000000` bytes, 1 GB) |
@@ -205,5 +204,5 @@ docker-compose.yml
 - Change `SECRET_KEY` before any public deployment. The admin password is hashed in SQLite, not stored in `.env`.
 - License keys are stored in plaintext so they can be exported and distributed.
 - The UI masks keys in call logs; the database still stores the submitted value.
-- BLOB download links are short-lived signed tokens issued only after a successful verify.
+- BLOB download links are signed tokens issued only after a successful verify; they do not expire.
 - Do not expose the admin console to the internet without TLS and a strong password.

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import result_btn with context %}
+{% from "macros.html" import result_text with context %}
 {% block title %}{{ t('dashboard_title') }} · {{ t('brand') }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -92,7 +92,7 @@
         <tr>
           <td>{{ log.created_at }}</td>
           <td><code>{{ log.key_code|mask_key }}</code></td>
-          <td>{{ result_btn(log.result) }}</td>
+          <td>{{ result_text(log.result) }}</td>
           <td>{{ log.hwid or t('none') }}</td>
           <td>{{ log.ip }}</td>
           <td>{{ log.duration_ms }} ms</td>

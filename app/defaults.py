@@ -25,13 +25,14 @@ FALLBACK_RESPONSES = {
     "disabled": {"code": 6, "msg": "disabled"},
 }
 
+DEFAULT_VALID_UNTIL = "2999-01-01 00:00:00"
+
 DEFAULT_CONFIG = {
     "bind_hwid": False,
     "defaults": {
-        "ttl_seconds": 86400,
         "max_uses": None,
         "valid_from": None,
-        "valid_until": None,
+        "valid_until": DEFAULT_VALID_UNTIL,
     },
     "responses": {key: dict(value) for key, value in FALLBACK_RESPONSES.items()},
 }

@@ -6,7 +6,7 @@ import json
 import math
 import re
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.defaults import (
     DEFAULT_CONFIG,
@@ -56,12 +56,13 @@ def normalize_config(data):
     merged["bind_hwid"] = bool(data.get("bind_hwid", merged["bind_hwid"]))
     incoming_defaults = data.get("defaults") or {}
     if isinstance(incoming_defaults, dict):
-        for field in ("ttl_seconds", "max_uses", "valid_from", "valid_until"):
+        for field in ("max_uses", "valid_from", "valid_until"):
             if field in incoming_defaults:
                 merged["defaults"][field] = incoming_defaults[field]
         merged["defaults"]["max_uses"] = parse_unlimited_int(
             merged["defaults"].get("max_uses")
         )
+        merged["defaults"].pop("ttl_seconds", None)
     incoming_responses = data.get("responses") or {}
     if isinstance(incoming_responses, dict):
         for code in RESULT_CODES:
@@ -132,24 +133,19 @@ def parse_iso_datetime(value):
 
 
 def compute_expires_at(key, now=None):
-    """Compute the earliest expiry instant for a key.
+    """Return the key's expiry instant.
 
     Args:
         key: License key ORM object.
-        now: Optional clock used when TTL starts on this call.
+        now: Unused; kept so existing call sites stay valid.
 
     Returns:
-        datetime | None: Expiry time, or ``None`` if unlimited.
+        datetime | None: ``valid_until``, or ``None`` if unset.
     """
-    candidates = []
-    if key.valid_until:
-        candidates.append(key.valid_until)
-    first_used = key.first_used_at or now
-    if key.ttl_seconds and first_used:
-        candidates.append(first_used + timedelta(seconds=key.ttl_seconds))
-    if not candidates:
+    del now
+    if key is None:
         return None
-    return min(candidates)
+    return key.valid_until
 
 
 def remaining_uses(key):
@@ -193,10 +189,6 @@ def evaluate_key(project, verification, key, hwid, now=None):
         return "not_yet_valid"
     if key.valid_until and now > key.valid_until:
         return "expired"
-    if key.ttl_seconds and key.first_used_at:
-        expiry = key.first_used_at + timedelta(seconds=key.ttl_seconds)
-        if now > expiry:
-            return "expired"
     if key.max_uses is not None and key.used_count >= key.max_uses:
         return "exhausted"
     config = parse_config(verification.config_json)
@@ -345,11 +337,6 @@ def sync_columns_from_config(verification):
     verification.config_json = json.dumps(config, ensure_ascii=False, indent=2)
     verification.bind_hwid = bool(config.get("bind_hwid"))
     defaults = config.get("defaults") or {}
-    ttl = defaults.get("ttl_seconds")
-    try:
-        verification.default_ttl_seconds = int(ttl) if ttl not in (None, "") else None
-    except (TypeError, ValueError):
-        verification.default_ttl_seconds = None
     verification.default_max_uses = parse_unlimited_int(defaults.get("max_uses"))
     verification.default_valid_from = parse_iso_datetime(defaults.get("valid_from"))
     verification.default_valid_until = parse_iso_datetime(defaults.get("valid_until"))

@@ -70,7 +70,6 @@ class Verification(db.Model):
     slug = db.Column(db.String(80), nullable=False, index=True)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
     bind_hwid = db.Column(db.Boolean, nullable=False, default=False)
-    default_ttl_seconds = db.Column(db.Integer, nullable=True)
     default_max_uses = db.Column(db.Integer, nullable=True)
     default_valid_from = db.Column(db.DateTime, nullable=True)
     default_valid_until = db.Column(db.DateTime, nullable=True)
@@ -121,7 +120,6 @@ class KeyBatch(db.Model):
     prefix = db.Column(db.String(32), nullable=False, default="")
     key_length = db.Column(db.Integer, nullable=False)
     charset = db.Column(db.String(128), nullable=False)
-    ttl_seconds = db.Column(db.Integer, nullable=True)
     max_uses = db.Column(db.Integer, nullable=True)
     valid_from = db.Column(db.DateTime, nullable=True)
     valid_until = db.Column(db.DateTime, nullable=True)
@@ -157,7 +155,6 @@ class LicenseKey(db.Model):
     )
     key_code = db.Column(db.String(128), nullable=False, index=True)
     status = db.Column(db.String(20), nullable=False, default="active")
-    ttl_seconds = db.Column(db.Integer, nullable=True)
     max_uses = db.Column(db.Integer, nullable=True)
     used_count = db.Column(db.Integer, nullable=False, default=0)
     valid_from = db.Column(db.DateTime, nullable=True)
@@ -183,7 +180,7 @@ class VerifyLog(db.Model):
     )
     key_id = db.Column(
         db.Integer,
-        db.ForeignKey("license_key.id"),
+        db.ForeignKey("license_key.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )

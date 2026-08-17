@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-DEFAULT_PORT = 1921
+DEFAULT_PORT = 22222
 MAX_BLOB_SIZE_CAP = 1_000_000_000
 MAX_BLOB_SIZE = MAX_BLOB_SIZE_CAP
 GUNICORN_TIMEOUT = 600
@@ -49,5 +49,4 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(days=30)
     WTF_CSRF_TIME_LIMIT = None
-    BLOB_TOKEN_TTL = 300
     MAX_BATCH_KEYS = 500

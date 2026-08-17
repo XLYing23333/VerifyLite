@@ -1,10 +1,10 @@
-"""Public verify API and short-lived blob download links."""
+"""Public verify API and blob download links."""
 
 import time
 from io import BytesIO
 
 from flask import Blueprint, current_app, jsonify, request, send_file, url_for
-from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from itsdangerous import BadSignature, URLSafeSerializer
 
 from app.defaults import FALLBACK_RESPONSES
 from app.extensions import db
@@ -15,16 +15,19 @@ api_bp = Blueprint("api", __name__, url_prefix="/api/v1")
 
 
 def _serializer():
-    """Build a timed serializer for blob download tokens.
+    """Build a serializer for blob download tokens.
+
+    Tokens do not expire. Access is still limited to a signed payload
+    issued after a successful verify.
 
     Returns:
-        URLSafeTimedSerializer: Serializer bound to the app secret.
+        URLSafeSerializer: Serializer bound to the app secret.
     """
-    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="vl-blob")
+    return URLSafeSerializer(current_app.config["SECRET_KEY"], salt="vl-blob")
 
 
 def make_blob_token(blob_id, verification_id, key_id):
-    """Create a short-lived download token for a blob.
+    """Create a download token for a blob.
 
     Args:
         blob_id: Stored blob primary key.
@@ -32,7 +35,7 @@ def make_blob_token(blob_id, verification_id, key_id):
         key_id: License key that passed verification.
 
     Returns:
-        str: URL-safe token.
+        str: URL-safe token with no expiry.
     """
     return _serializer().dumps(
         {"b": blob_id, "v": verification_id, "k": key_id},
@@ -153,17 +156,14 @@ def download_blob(token):
     """Download a blob authorized by a successful verify token.
 
     Args:
-        token: Timed signer payload.
+        token: Signed payload issued after a successful verify.
 
     Returns:
         Response: File bytes, or JSON error when the token is invalid.
     """
     try:
-        data = _serializer().loads(
-            token,
-            max_age=current_app.config["BLOB_TOKEN_TTL"],
-        )
-    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        data = _serializer().loads(token)
+    except (BadSignature, TypeError, ValueError):
         return jsonify(FALLBACK_RESPONSES["invalid_key"]), 403
     blob = db.session.get(BlobObject, data.get("b"))
     key = db.session.get(LicenseKey, data.get("k"))

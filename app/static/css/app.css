@@ -343,6 +343,11 @@ input, select, textarea, button {
   --bs-table-border-color: var(--line);
 }
 
+.table thead th {
+  text-align: center;
+  vertical-align: middle;
+}
+
 .table a { color: var(--accent-2); text-decoration: none; }
 
 .empty {
@@ -383,10 +388,6 @@ input, select, textarea, button {
 
 .table form {
   margin: 0;
-}
-
-.table thead th:last-child {
-  text-align: right;
 }
 
 .btn span { margin-left: 6px; }
@@ -512,6 +513,34 @@ button.status-bad:hover {
   background: transparent;
   border-color: var(--danger);
   color: var(--danger);
+}
+
+.result-text {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.result-success {
+  color: var(--accent);
+}
+
+.result-disabled {
+  color: var(--muted);
+}
+
+.result-not_yet_valid {
+  color: var(--accent-2);
+}
+
+.result-expired,
+.result-exhausted,
+.result-invalid_key,
+.result-hwid_mismatch {
+  color: var(--danger);
+}
+
+.key-code {
+  word-break: break-all;
 }
 
 .form-control,
@@ -738,6 +767,169 @@ input[type="number"]::-webkit-outer-spin-button {
 .cselect-option:disabled {
   color: var(--muted);
   cursor: default;
+}
+
+.cdtp {
+  position: relative;
+  width: 100%;
+}
+
+.cdtp-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+button.cdtp-toggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.cdtp-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cdtp.is-empty .cdtp-label {
+  color: var(--muted);
+}
+
+.cdtp-toggle > i {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.cdtp.is-open .cdtp-toggle {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.cdtp-menu {
+  display: none;
+  position: fixed;
+  z-index: 80;
+  overflow: auto;
+  padding: 12px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--control-radius);
+  box-shadow: var(--shadow);
+}
+
+.cdtp.is-open .cdtp-menu {
+  display: block;
+}
+
+.cdtp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.cdtp-month-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.cdtp-year {
+  width: 5.5rem;
+  min-height: 34px;
+  text-align: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.cdtp-month-label {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.cdtp-weekdays,
+.cdtp-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.cdtp-weekdays span {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  padding: 4px 0;
+}
+
+.cdtp-day {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  border-radius: 8px;
+  height: 32px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.cdtp-day:hover {
+  background: var(--bg-soft);
+}
+
+.cdtp-day.is-outside {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.cdtp-day.is-today:not(.is-selected) {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.cdtp-day.is-selected {
+  background: var(--accent);
+  color: var(--btn-on-accent);
+}
+
+.cdtp-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cdtp-hour,
+.cdtp-minute {
+  width: 4.5rem;
+  min-height: 34px;
+  text-align: center;
+}
+
+.cdtp-time-sep {
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.cdtp-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 input[type="datetime-local"],
@@ -1306,6 +1498,11 @@ code {
 
 .app-toast-danger > i {
   color: var(--danger);
+}
+
+.app-toast-info {
+  background: color-mix(in srgb, var(--accent-2) 14%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--accent-2) 36%, var(--line));
 }
 
 .app-toast-info > i {

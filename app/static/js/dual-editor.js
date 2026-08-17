@@ -231,7 +231,6 @@
     return {
       bind_hwid: document.getElementById("bind_hwid").checked,
       defaults: {
-        ttl_seconds: numberOrNull(document.getElementById("ttl_seconds").value),
         max_uses: usesOrNull(document.getElementById("max_uses").value),
         valid_from: fromDatetimeLocal(document.getElementById("valid_from").value),
         valid_until: fromDatetimeLocal(document.getElementById("valid_until").value)
@@ -243,8 +242,6 @@
   function fillForm(config, resultCodes, labels, blobs) {
     const defaults = config.defaults || {};
     document.getElementById("bind_hwid").checked = Boolean(config.bind_hwid);
-    document.getElementById("ttl_seconds").value =
-      defaults.ttl_seconds === null || defaults.ttl_seconds === undefined ? "" : defaults.ttl_seconds;
     document.getElementById("max_uses").value = displayMaxUses(defaults.max_uses);
     document.getElementById("valid_from").value = toDatetimeLocal(defaults.valid_from);
     document.getElementById("valid_until").value = toDatetimeLocal(defaults.valid_until);

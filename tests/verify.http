@@ -1,7 +1,7 @@
-@host = http://127.0.0.1:1921
+@host = http://127.0.0.1:22222
 @project = demo1
 @verify = test1
-@key = VL-XXXX-XXXX-XXXX-XXXX
+@key = VLYOURLICENSEKEY
 @hwid = test-hwid-01
 
 ### JSON verify
@@ -18,4 +18,3 @@ POST {{host}}/api/v1/{{project}}/{{verify}}
 Content-Type: application/x-www-form-urlencoded
 
 key={{key}}&hwid={{hwid}}
- 

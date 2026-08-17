@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import icon_btn, result_btn with context %}
+{% from "macros.html" import icon_btn, result_text with context %}
 {% block title %}{{ t('logs_title') }} · {{ verification.name }}{% endblock %}
 {% block content %}
 <div class="page-head">
@@ -48,7 +48,7 @@
         <tr>
           <td>{{ log.created_at }}</td>
           <td><code>{{ log.key_code|mask_key }}</code></td>
-          <td>{{ result_btn(log.result) }}</td>
+          <td>{{ result_text(log.result) }}</td>
           <td>{{ log.hwid or t('none') }}</td>
           <td>{{ log.ip }}</td>
           <td class="ua-cell">{{ log.user_agent }}</td>

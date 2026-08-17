@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-click source deployment: venv, deps, .env, then listen on port 1921.
+# One-click source deployment: venv, deps, .env, then listen on port 22222.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,7 +28,7 @@ if [[ ! -f .env ]]; then
 fi
 
 PORT_VALUE="$(grep -E '^PORT=' .env | tail -n 1 | cut -d= -f2- || true)"
-export PORT="${PORT_VALUE:-1921}"
+export PORT="${PORT_VALUE:-22222}"
 export FLASK_APP=run.py
 
 if [[ "${PROD:-0}" == "1" ]]; then

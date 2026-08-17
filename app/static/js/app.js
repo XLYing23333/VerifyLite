@@ -67,6 +67,390 @@
     return "welight";
   }
 
+  function pickerCopy() {
+    const root = document.documentElement;
+    const zh = String(root.lang || "en").toLowerCase().indexOf("zh") === 0;
+    return {
+      zh: zh,
+      monthsEn: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+      monthsShortEn: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+      weekdays: zh ? ["日", "一", "二", "三", "四", "五", "六"] : ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"],
+      clear: root.getAttribute("data-picker-clear") || (zh ? "清除" : "Clear"),
+      now: root.getAttribute("data-picker-now") || (zh ? "此刻" : "Now"),
+      empty: root.getAttribute("data-picker-placeholder") || (zh ? "选择日期时间" : "Select date and time")
+    };
+  }
+
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function parseDateTimeLocal(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!match) {
+      return null;
+    }
+    return new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      Number(match[4]),
+      Number(match[5]),
+      0
+    );
+  }
+
+  function toDateTimeLocal(date) {
+    return (
+      date.getFullYear() +
+      "-" +
+      pad2(date.getMonth() + 1) +
+      "-" +
+      pad2(date.getDate()) +
+      "T" +
+      pad2(date.getHours()) +
+      ":" +
+      pad2(date.getMinutes())
+    );
+  }
+
+  function formatDateTimeDisplay(value) {
+    const copy = pickerCopy();
+    const date = parseDateTimeLocal(value);
+    if (!date) {
+      return copy.empty;
+    }
+    const time = pad2(date.getHours()) + ":" + pad2(date.getMinutes());
+    if (copy.zh) {
+      return date.getFullYear() + "年" + (date.getMonth() + 1) + "月" + date.getDate() + "日 " + time;
+    }
+    return copy.monthsShortEn[date.getMonth()] + " " + date.getDate() + ", " + date.getFullYear() + ", " + time;
+  }
+
+  function closeAllDateTimes(except) {
+    document.querySelectorAll(".cdtp.is-open").forEach(function (wrap) {
+      if (wrap !== except) {
+        wrap.classList.remove("is-open");
+      }
+    });
+  }
+
+  function placeDateMenu(wrap) {
+    const toggle = wrap.querySelector(".cdtp-toggle");
+    const menu = wrap.querySelector(".cdtp-menu");
+    if (!toggle || !menu) {
+      return;
+    }
+    const rect = toggle.getBoundingClientRect();
+    const width = Math.max(rect.width, 320);
+    menu.style.width = width + "px";
+    menu.style.left = Math.min(rect.left, window.innerWidth - width - 8) + "px";
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const estimated = 360;
+    if (spaceBelow < estimated && rect.top > spaceBelow) {
+      menu.style.top = "auto";
+      menu.style.bottom = window.innerHeight - rect.top + 4 + "px";
+      menu.style.maxHeight = Math.min(420, rect.top - 12) + "px";
+    } else {
+      menu.style.bottom = "auto";
+      menu.style.top = rect.bottom + 4 + "px";
+      menu.style.maxHeight = Math.min(420, spaceBelow - 12) + "px";
+    }
+  }
+
+  function interceptInputValue(input, onSet) {
+    if (input.dataset.valueIntercept === "1") {
+      return;
+    }
+    input.dataset.valueIntercept = "1";
+    const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      enumerable: true,
+      get: function () {
+        return desc.get.call(this);
+      },
+      set: function (next) {
+        desc.set.call(this, next);
+        onSet();
+      }
+    });
+  }
+
+  function enhanceDateTime(input) {
+    if (input.dataset.enhanced === "1" || input.type !== "datetime-local") {
+      return;
+    }
+    input.dataset.enhanced = "1";
+    const wrap = document.createElement("div");
+    wrap.className = "cdtp";
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    input.classList.add("cdtp-native");
+    input.tabIndex = -1;
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "form-control cdtp-toggle";
+    const label = document.createElement("span");
+    label.className = "cdtp-label";
+    toggle.appendChild(label);
+    const icon = document.createElement("i");
+    icon.className = "bi bi-calendar3";
+    icon.setAttribute("aria-hidden", "true");
+    toggle.appendChild(icon);
+    wrap.appendChild(toggle);
+
+    const menu = document.createElement("div");
+    menu.className = "cdtp-menu";
+    wrap.appendChild(menu);
+
+    const view = { year: 0, month: 0, hour: 0, minute: 0, day: 1 };
+
+    function currentDate() {
+      return parseDateTimeLocal(input.value) || new Date();
+    }
+
+    function syncLabel() {
+      const value = input.value;
+      label.textContent = formatDateTimeDisplay(value);
+      wrap.classList.toggle("is-empty", !value);
+    }
+
+    function writeValue(date) {
+      const next = toDateTimeLocal(date);
+      const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+      desc.set.call(input, next);
+      syncLabel();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function loadViewFromValue() {
+      const date = currentDate();
+      view.year = date.getFullYear();
+      view.month = date.getMonth();
+      view.day = date.getDate();
+      view.hour = date.getHours();
+      view.minute = date.getMinutes();
+    }
+
+    function selectedDate() {
+      const dim = new Date(view.year, view.month + 1, 0).getDate();
+      if (view.day > dim) {
+        view.day = dim;
+      }
+      return new Date(view.year, view.month, view.day, view.hour, view.minute, 0);
+    }
+
+    function renderMenu() {
+      const copy = pickerCopy();
+      const monthLabel = copy.zh
+        ? (view.month + 1) + "月"
+        : copy.monthsEn[view.month];
+      const first = new Date(view.year, view.month, 1);
+      const startWeekday = first.getDay();
+      const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
+      const prevDays = new Date(view.year, view.month, 0).getDate();
+      const today = new Date();
+      const selected = parseDateTimeLocal(input.value);
+      let html = "";
+      html += '<div class="cdtp-head">';
+      html += '<button type="button" class="btn btn-sm btn-outline-secondary icon-only cdtp-nav" data-delta="-1" aria-label="Previous month"><i class="bi bi-chevron-left"></i></button>';
+      html += '<div class="cdtp-month-wrap">';
+      html += '<input class="form-control cdtp-year" type="number" min="1" max="9999" value="' + view.year + '">';
+      html += '<span class="cdtp-month-label">' + monthLabel + "</span>";
+      html += "</div>";
+      html += '<button type="button" class="btn btn-sm btn-outline-secondary icon-only cdtp-nav" data-delta="1" aria-label="Next month"><i class="bi bi-chevron-right"></i></button>';
+      html += "</div>";
+      html += '<div class="cdtp-weekdays">';
+      copy.weekdays.forEach(function (name) {
+        html += "<span>" + name + "</span>";
+      });
+      html += '</div><div class="cdtp-days">';
+      const cells = [];
+      for (let i = 0; i < startWeekday; i += 1) {
+        cells.push({
+          day: prevDays - startWeekday + i + 1,
+          outside: true,
+          year: view.month === 0 ? view.year - 1 : view.year,
+          month: view.month === 0 ? 11 : view.month - 1
+        });
+      }
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        cells.push({ day: day, outside: false, year: view.year, month: view.month });
+      }
+      let extra = 1;
+      while (cells.length % 7 !== 0) {
+        cells.push({
+          day: extra,
+          outside: true,
+          year: view.month === 11 ? view.year + 1 : view.year,
+          month: view.month === 11 ? 0 : view.month + 1
+        });
+        extra += 1;
+      }
+      cells.forEach(function (cell) {
+        const classes = ["cdtp-day"];
+        if (cell.outside) {
+          classes.push("is-outside");
+        }
+        if (
+          cell.year === today.getFullYear() &&
+          cell.month === today.getMonth() &&
+          cell.day === today.getDate()
+        ) {
+          classes.push("is-today");
+        }
+        if (
+          selected &&
+          cell.year === selected.getFullYear() &&
+          cell.month === selected.getMonth() &&
+          cell.day === selected.getDate()
+        ) {
+          classes.push("is-selected");
+        }
+        html +=
+          '<button type="button" class="' +
+          classes.join(" ") +
+          '" data-year="' +
+          cell.year +
+          '" data-month="' +
+          cell.month +
+          '" data-day="' +
+          cell.day +
+          '">' +
+          cell.day +
+          "</button>";
+      });
+      html += "</div>";
+      html += '<div class="cdtp-time">';
+      html += '<input class="form-control cdtp-hour" type="number" min="0" max="23" value="' + pad2(view.hour) + '">';
+      html += '<span class="cdtp-time-sep">:</span>';
+      html += '<input class="form-control cdtp-minute" type="number" min="0" max="59" value="' + pad2(view.minute) + '">';
+      html += "</div>";
+      html += '<div class="cdtp-foot">';
+      html += '<button type="button" class="btn btn-sm btn-outline-secondary cdtp-clear">' + copy.clear + "</button>";
+      html += '<button type="button" class="btn btn-sm btn-outline-secondary cdtp-now">' + copy.now + "</button>";
+      html += "</div>";
+      menu.innerHTML = html;
+    }
+
+    function openMenu() {
+      loadViewFromValue();
+      renderMenu();
+      closeAllSelects();
+      closeAllDateTimes();
+      wrap.classList.add("is-open");
+      placeDateMenu(wrap);
+    }
+
+    function applyDay(year, month, day) {
+      view.year = year;
+      view.month = month;
+      view.day = day;
+      writeValue(selectedDate());
+      renderMenu();
+      placeDateMenu(wrap);
+    }
+
+    toggle.addEventListener("click", function (event) {
+      event.preventDefault();
+      if (input.disabled) {
+        return;
+      }
+      if (wrap.classList.contains("is-open")) {
+        wrap.classList.remove("is-open");
+        return;
+      }
+      openMenu();
+    });
+
+    menu.addEventListener("click", function (event) {
+      const nav = event.target.closest(".cdtp-nav");
+      if (nav) {
+        const delta = Number(nav.getAttribute("data-delta") || 0);
+        const next = new Date(view.year, view.month + delta, 1);
+        view.year = next.getFullYear();
+        view.month = next.getMonth();
+        renderMenu();
+        placeDateMenu(wrap);
+        return;
+      }
+      const dayBtn = event.target.closest(".cdtp-day");
+      if (dayBtn) {
+        applyDay(
+          Number(dayBtn.getAttribute("data-year")),
+          Number(dayBtn.getAttribute("data-month")),
+          Number(dayBtn.getAttribute("data-day"))
+        );
+        return;
+      }
+      if (event.target.closest(".cdtp-clear")) {
+        const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+        desc.set.call(input, "");
+        syncLabel();
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+        wrap.classList.remove("is-open");
+        return;
+      }
+      if (event.target.closest(".cdtp-now")) {
+        const now = new Date();
+        view.year = now.getFullYear();
+        view.month = now.getMonth();
+        view.day = now.getDate();
+        view.hour = now.getHours();
+        view.minute = now.getMinutes();
+        writeValue(now);
+        renderMenu();
+        placeDateMenu(wrap);
+      }
+    });
+
+    menu.addEventListener("change", function (event) {
+      if (event.target.classList.contains("cdtp-year")) {
+        const year = Number(event.target.value);
+        if (Number.isFinite(year) && year >= 1 && year <= 9999) {
+          view.year = year;
+          writeValue(selectedDate());
+          renderMenu();
+          placeDateMenu(wrap);
+        }
+      }
+    });
+
+    menu.addEventListener("input", function (event) {
+      if (event.target.classList.contains("cdtp-hour")) {
+        let hour = Number(event.target.value);
+        if (!Number.isFinite(hour)) {
+          return;
+        }
+        hour = Math.max(0, Math.min(23, hour));
+        view.hour = hour;
+        writeValue(selectedDate());
+      }
+      if (event.target.classList.contains("cdtp-minute")) {
+        let minute = Number(event.target.value);
+        if (!Number.isFinite(minute)) {
+          return;
+        }
+        minute = Math.max(0, Math.min(59, minute));
+        view.minute = minute;
+        writeValue(selectedDate());
+      }
+    });
+
+    interceptInputValue(input, syncLabel);
+    input.addEventListener("input", syncLabel);
+    input.addEventListener("change", syncLabel);
+    syncLabel();
+  }
+
+  function enhanceDateTimes(root) {
+    (root || document).querySelectorAll("input[type='datetime-local']").forEach(enhanceDateTime);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     const back = document.getElementById("nav-back");
     const forward = document.getElementById("nav-forward");
@@ -129,6 +513,7 @@
     bindFileFields();
     bindPasswordToggles();
     enhanceSelects(document);
+    enhanceDateTimes(document);
     observeSelects();
   });
 
@@ -330,6 +715,7 @@
       }
       const open = !wrap.classList.contains("is-open");
       closeAllSelects();
+      closeAllDateTimes();
       if (open) {
         wrap.classList.add("is-open");
         placeMenu(wrap);
@@ -359,17 +745,23 @@
       if (!event.target.closest(".cselect")) {
         closeAllSelects();
       }
+      if (!event.target.closest(".cdtp")) {
+        closeAllDateTimes();
+      }
     });
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
         closeAllSelects();
+        closeAllDateTimes();
       }
     });
     window.addEventListener("resize", function () {
       document.querySelectorAll(".cselect.is-open").forEach(placeMenu);
+      document.querySelectorAll(".cdtp.is-open").forEach(placeDateMenu);
     });
     window.addEventListener("scroll", function () {
       document.querySelectorAll(".cselect.is-open").forEach(placeMenu);
+      document.querySelectorAll(".cdtp.is-open").forEach(placeDateMenu);
     }, true);
     const observer = new MutationObserver(function (mutations) {
       mutations.forEach(function (mutation) {
@@ -380,8 +772,12 @@
           if (node.matches && node.matches("select.form-select")) {
             enhanceSelect(node);
           }
+          if (node.matches && node.matches("input[type='datetime-local']")) {
+            enhanceDateTime(node);
+          }
           if (node.querySelectorAll) {
             enhanceSelects(node);
+            enhanceDateTimes(node);
           }
         });
       });

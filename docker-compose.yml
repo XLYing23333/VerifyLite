@@ -3,10 +3,10 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "${PORT:-1921}:1921"
+      - "${PORT:-22222}:22222"
     environment:
       SECRET_KEY: ${SECRET_KEY:-change-me-to-a-long-random-string}
-      PORT: "1921"
+      PORT: "22222"
       DATA_DIR: /app/data
       MAX_BLOB_SIZE: ${MAX_BLOB_SIZE:-1000000000}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-1}
@@ -19,7 +19,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:1921/healthz')",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:22222/healthz')",
         ]
       interval: 30s
       timeout: 5s

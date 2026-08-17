@@ -53,8 +53,6 @@
         <input class="form-check-input js-sync" type="checkbox" id="bind_hwid"{% if config.bind_hwid %} checked{% endif %}>
         <label class="form-check-label" for="bind_hwid">{{ t('bind_hwid') }}</label>
       </div>
-      <label class="form-label" for="ttl_seconds">{{ t('ttl_seconds') }}</label>
-      <input class="form-control js-sync" id="ttl_seconds" type="number" min="0" placeholder="{{ t('no_limit_hint') }}" value="{{ config.defaults.ttl_seconds if config.defaults.ttl_seconds is not none else '' }}">
       <label class="form-label" for="max_uses">{{ t('max_uses') }}</label>
       <input class="form-control js-sync" id="max_uses" type="text" inputmode="numeric" placeholder="{{ t('no_limit_hint') }}" value="{{ config.defaults.max_uses if config.defaults.max_uses is not none else 'infty' }}">
       <label class="form-label" for="valid_from">{{ t('valid_from') }}</label>
@@ -99,7 +97,7 @@
         <textarea class="form-control font-mono json-editor" id="config_json" name="config_json" rows="18">{{ config_json }}</textarea>
       </section>
       {% set api_url = url_for('api.verify', project_slug=project.slug, verify_slug=verification.slug, _external=True) %}
-      {% set api_body = '{"key":"VL-XXXX-XXXX","hwid":"your-machine-id"}' %}
+      {% set api_body = '{"key":"VLYOURLICENSEKEY","hwid":"your-machine-id"}' %}
       <section class="panel api-docs">
         <h2><i class="bi bi-code-slash"></i> {{ t('api_docs_title') }}</h2>
         <div class="api-endpoint">
@@ -150,7 +148,7 @@
 </form>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/dual-editor.js', v='20260814c') }}"></script>
+<script src="{{ url_for('static', filename='js/dual-editor.js', v='20260817a') }}"></script>
 <script>
   window.VerifyLiteDual.init({
     resultCodes: {{ result_codes|tojson }},

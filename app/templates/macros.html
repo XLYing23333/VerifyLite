@@ -33,6 +33,6 @@
 {%- endif -%}
 {%- endmacro %}
 
-{% macro result_btn(code) -%}
-{{ status_btn(t('res_' + code), 'ok' if code == 'success' else 'off') }}
+{% macro result_text(code) -%}
+<span class="result-text result-{{ code }}">{{ t('res_' + code) }}</span>
 {%- endmacro %}
